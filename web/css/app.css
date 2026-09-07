@@ -32,8 +32,8 @@
   color-scheme: dark;
 }
 
-* { box-sizing: border-box; min-width: 0; }
-html, body { margin: 0; padding: 0; width: 100%; max-width: 100vw; overflow-x: hidden; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; width: 100%; max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 img, svg, video, canvas { max-width: 100%; }
 body {
   font-family: var(--font-sans);
@@ -60,7 +60,7 @@ a { color: var(--bordeaux-light); }
 .grow { flex: 1; }
 
 /* Layout */
-.app { display: grid; grid-template-rows: auto 1fr auto; min-height: 100dvh; width: 100%; max-width: 100vw; overflow-x: clip; }
+.app { display: grid; grid-template-rows: auto 1fr auto; min-height: 100dvh; width: 100%; max-width: 100%; overflow-x: clip; }
 .topbar {
   display: flex; align-items: center; gap: 1rem; padding: 0.6rem 1rem;
   background: linear-gradient(135deg, var(--bordeaux-deep), var(--bordeaux));
@@ -151,7 +151,7 @@ legend { font-family: var(--font-serif); font-weight: 600; color: var(--bordeaux
 }
 .fav { position: absolute; top: 0.5rem; left: 0.9rem; color: var(--gold); font-size: 1.1rem; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
 
-.badge { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); color: var(--muted); font-weight: 600; white-space: normal; max-width: 100%; }
+.badge { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); color: var(--muted); font-weight: 600; white-space: nowrap; max-width: 100%; }
 .badge.ok { background: rgba(63,125,79,0.12); color: var(--ok); border-color: transparent; }
 .badge.warn { background: rgba(183,121,31,0.14); color: var(--warn); border-color: transparent; }
 .badge.bad { background: rgba(168,50,50,0.12); color: var(--bad); border-color: transparent; }
@@ -192,7 +192,7 @@ legend { font-family: var(--font-serif); font-weight: 600; color: var(--bordeaux
 .table th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .table-wrap { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
 .card { max-width: 100%; }
-.row > * { min-width: 0; }
+.row > .grow, .grid > *, .form-grid > *, .kpis > * { min-width: 0; }
 .note { border-left: 3px solid var(--gold); padding: 0.5rem 0.8rem; background: var(--paper); border-radius: 0 10px 10px 0; }
 .note + .note { margin-top: 0.6rem; }
 
@@ -240,7 +240,7 @@ legend { font-family: var(--font-serif); font-weight: 600; color: var(--bordeaux
 .history-item { display: grid; grid-template-columns: 48px 1fr auto; gap: 0.7rem; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--line); }
 .history-item img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; }
 .history-item .ph { width: 48px; height: 48px; border-radius: 8px; display: grid; place-items: center; font-size: 1.3rem; }
-code { background: var(--paper); padding: 0.1rem 0.35rem; border-radius: 6px; font-size: 0.85em; word-break: break-all; }
+code { background: var(--paper); padding: 0.1rem 0.35rem; border-radius: 6px; font-size: 0.85em; overflow-wrap: anywhere; }
 .tabs { display: flex; gap: 0.3rem; border-bottom: 1px solid var(--line); margin-bottom: 1rem; overflow-x: auto; }
 .tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 0.6rem 0.9rem; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .tabs button.active { color: var(--bordeaux-light); border-bottom-color: var(--gold); font-weight: 600; }
@@ -277,7 +277,7 @@ input[type="range"] { height: 44px; }
   .row.between { gap: 0.4rem; }
   .row.between > h1 { flex: 1 1 100%; }
   .kv { grid-template-columns: minmax(0, max-content) 1fr; }
-  .kv dt, .kv dd { overflow-wrap: anywhere; }
+  .kv dt, .kv dd { overflow-wrap: break-word; }
   .form-grid .row, .row { flex-wrap: wrap; }
   .bulk-item { grid-template-columns: 64px 1fr; }
   .bulk-thumb { width: 64px; height: 84px; }
@@ -333,7 +333,7 @@ input[type="range"] { height: 44px; }
   .topbar { padding-top: max(0.6rem, env(safe-area-inset-top)); }
 }
 /* Tekst in kaarten netjes afbreken */
-.wine-card h3, .wine-card .producer, .kv dd, .note, .history-item { overflow-wrap: anywhere; }
+
 /* Scrollen in modals en tabellen soepel op iOS */
 .modal, .table-wrap { -webkit-overflow-scrolling: touch; }
 /* Selecties lichter op mobiel */
@@ -384,7 +384,7 @@ select { background-image: linear-gradient(45deg, transparent 50%, var(--muted) 
   .wine-card .body { padding: 0.5rem 0.6rem 0.65rem; }
   .wine-card h3 { font-size: 0.9rem; }
   .count-badge { font-size: 0.72rem; padding: 0.15rem 0.45rem; }
-  .badge { font-size: 0.68rem; }
+  .badge { font-size: 0.68rem; white-space: normal; }
   .btn { padding: 0.55rem 0.8rem; font-size: 0.92rem; }
   .btn.sm { padding: 0.35rem 0.55rem; font-size: 0.8rem; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -398,12 +398,14 @@ select { background-image: linear-gradient(45deg, transparent 50%, var(--muted) 
 input[style*="width"], select[style*="width"] { max-width: 100%; }
 
 /* Lange onafbreekbare tekst (links, codes, e-mail) nooit buiten het scherm */
-a, code, .kv dd, .note, .small, p, li, td, .badge { overflow-wrap: anywhere; }
+/* Normale tekst breekt alleen af als een woord écht niet past; 'anywhere' alleen voor links en codes */
+p, li, td, .note, .small, .badge, .kv dd, .wine-card h3, .wine-card .producer, .history-item { overflow-wrap: break-word; }
+a[href^="http"], code { overflow-wrap: anywhere; }
 .mm-attribution { max-width: 70%; white-space: normal; }
 /* Rijen met knoppen: op mobiel netjes wrappen en knoppen niet uit beeld */
 @media (max-width: 899px) {
   .row .btn, .row .btn.sm { max-width: 100%; white-space: normal; text-align: center; }
-  .modal { width: 100vw; max-width: 100vw; left: 0; right: 0; }
+  .modal { width: 100%; max-width: 100%; }
   .modal-backdrop { padding: 0; }
   /* Hero/login op kleine schermen */
   .hero { min-height: auto; padding: 1rem 0; }
