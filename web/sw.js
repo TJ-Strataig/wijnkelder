@@ -4,7 +4,7 @@ const SHELL = [
   './', './index.html', './config.js', './manifest.webmanifest', './css/app.css', './icons/icon.svg', './icons/apple-touch-icon.png',
   './js/app.js', './js/api.js', './js/auth.js', './js/util.js', './js/pairings.js', './js/data.js',
   './js/views/login.js', './js/views/cellar.js', './js/views/wine.js', './js/views/add.js', './js/views/history.js',
-  './js/views/pairing.js', './js/views/stats.js', './js/views/wishlist.js', './js/views/admin.js', './js/views/settings.js', './js/views/map.js', './js/views/producers.js', './js/minimap.js',
+  './js/views/pairing.js', './js/views/stats.js', './js/views/wishlist.js', './js/views/admin.js', './js/views/settings.js', './js/views/map.js', './js/views/bulk.js', './js/views/producers.js', './js/minimap.js',
 ];
 
 self.addEventListener('install', (e) => {

@@ -9,7 +9,8 @@ export async function render(main, { params, mode, navigate }) {
   let existing = null;
   if (editing) existing = (await api.get(`/api/wines/${params[0]}`)).wine;
 
-  main.append(el('h1', { text: editing ? `Bewerken — ${existing.name}` : 'Wijn toevoegen' }));
+  main.append(el('div', { class: 'row between' }, el('h1', { text: editing ? `Bewerken — ${existing.name}` : 'Wijn toevoegen' }),
+    editing ? null : el('a', { class: 'btn ghost sm', href: '#/bulk', text: '📷 Meerdere flessen tegelijk' })));
   const wrap = el('div', { class: 'stack' });
   main.append(wrap);
 

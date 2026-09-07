@@ -8,6 +8,7 @@ alle leden zien en beheren dezelfde collectie.
 
 **Collectie**
 - **AI naar keuze**: onder *Instellingen → AI-sommelier* kiest de beheerder tussen **Anthropic (Claude Sonnet 4.5, Opus 4.1, Haiku 4.5, …)** en **OpenAI**, voert de API-sleutel in (versleuteld opgeslagen) en test de verbinding met één klik.
+- **Bulk toevoegen**: kies meerdere etiketfoto's tegelijk (of fotografeer fles na fles); de AI herkent ze in een wachtrij en je controleert en keurt **elke fles apart goed** (naam, jaargang, aantal, prijs, locatie) voordat hij in de kelder komt. Duplicaten worden herkend en als extra flessen bijgeboekt. Gedeelde aankoopgegevens (datum, winkel, kelderlocatie) vul je één keer in.
 - Wijnen toevoegen **via een foto van het etiket** (AI herkent producent, naam, jaargang, land, streek, appellatie, druiven, alcohol, stijl, drinkvenster, ontwikkeling, gerechten, beschrijving en een prijsindicatie) of **handmatig**, met een knop om ontbrekende gegevens door AI te laten aanvullen.
 - **Meerdere flessen** per wijn, elk met eigen prijs, aankoopdatum, winkel, inhoud (halve fles t/m dubbele magnum) en **locatie in de kelder** (rek/plank).
 - Per fles vastleggen of het een **gekregen fles** is (en van wie). Voor gekregen flessen haalt de app met één klik een **prijsindicatie** op (webzoekresultaten + AI, met bronvermelding en zekerheid).

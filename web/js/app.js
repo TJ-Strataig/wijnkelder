@@ -14,6 +14,7 @@ import * as wishlist from './views/wishlist.js';
 import * as admin from './views/admin.js';
 import * as settings from './views/settings.js';
 import * as mapView from './views/map.js';
+import * as bulk from './views/bulk.js';
 import * as producers from './views/producers.js';
 
 const NAV = [
@@ -30,6 +31,7 @@ const ROUTES = [
   { pattern: /^\/kelder$/, view: cellar },
   { pattern: /^\/wijn\/([^/]+)$/, view: wine },
   { pattern: /^\/toevoegen$/, view: add },
+  { pattern: /^\/bulk$/, view: bulk },
   { pattern: /^\/wijn\/([^/]+)\/bewerken$/, view: add, mode: 'edit' },
   { pattern: /^\/historie$/, view: history },
   { pattern: /^\/spijs$/, view: pairing },
@@ -57,12 +59,12 @@ function renderNav(active) {
   const side = document.getElementById('sidenav');
   const bottom = document.getElementById('bottomnav');
   clear(side); clear(bottom);
-  const items = [...NAV.filter((n) => n.path !== '/meer'), { path: '/herkomst', label: 'Herkomst', ico: '🗺️' }, { path: '/wijnhuizen', label: 'Wijnhuizen', ico: '🏡' }, { path: '/statistieken', label: 'Statistieken', ico: '📊' }, { path: '/verlanglijst', label: 'Verlanglijst', ico: '📝' }];
+  const items = [...NAV.filter((n) => n.path !== '/meer'), { path: '/bulk', label: 'Bulk', ico: '📷' }, { path: '/herkomst', label: 'Herkomst', ico: '🗺️' }, { path: '/wijnhuizen', label: 'Wijnhuizen', ico: '🏡' }, { path: '/statistieken', label: 'Statistieken', ico: '📊' }, { path: '/verlanglijst', label: 'Verlanglijst', ico: '📝' }];
   if (user?.role === 'admin') items.push({ path: '/beheer', label: 'Beheer', ico: '👥' });
   items.push({ path: '/instellingen', label: 'Instellingen', ico: '⚙️' });
   for (const n of items) side.append(el('a', { href: `#${n.path}`, class: active === n.path ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));
   for (const n of NAV) {
-    const isActive = active === n.path || (n.path === '/meer' && ['/herkomst', '/wijnhuizen', '/statistieken', '/verlanglijst', '/beheer', '/instellingen'].includes(active));
+    const isActive = active === n.path || (n.path === '/meer' && ['/bulk', '/herkomst', '/wijnhuizen', '/statistieken', '/verlanglijst', '/beheer', '/instellingen'].includes(active));
     bottom.append(el('a', { href: `#${n.path}`, class: isActive ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));
   }
   document.getElementById('user-chip').textContent = user ? user.name : '';
@@ -71,6 +73,7 @@ function renderNav(active) {
 function renderMore(main) {
   const user = session.user;
   const links = [
+    ['/bulk', '📷', 'Bulk toevoegen', 'Meerdere etiketfoto\'s tegelijk, per fles controleren en goedkeuren'],
     ['/herkomst', '🗺️', 'Herkomst', 'Topografische kaart: waar komen onze wijnen vandaan?'],
     ['/wijnhuizen', '🏡', 'Wijnhuizen', 'Informatie over de producenten in onze kelder'],
     ['/statistieken', '📊', 'Statistieken', 'Waarde, verdeling, wat nu drinken'],
