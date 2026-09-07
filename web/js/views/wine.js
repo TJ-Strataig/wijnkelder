@@ -4,6 +4,7 @@ import { api, photoUrl } from '../api.js';
 import { invalidateWines } from '../data.js';
 import { dishesForWine } from '../pairings.js';
 import { producerPanel } from './producers.js';
+import { scanBarcode } from '../barcode.js';
 
 const year = new Date().getFullYear();
 
@@ -29,6 +30,7 @@ export async function render(main, { params, navigate }) {
       el('a', { href: '#/kelder', class: 'muted small', text: '← Terug naar de kelder' }),
       el('div', { class: 'row' },
         el('button', { class: 'btn ghost sm', type: 'button', text: w.favorite ? '★ Favoriet' : '☆ Favoriet', onClick: async () => { await api.post(`/api/wines/${w.id}/favorite`, { favorite: !w.favorite }); reload(); } }),
+        el('button', { class: 'btn ghost sm', type: 'button', text: w.barcode ? '▥' : '▥ Code koppelen', title: 'Streepjescode scannen en aan deze wijn koppelen', onClick: async () => { try { const code = await scanBarcode(); if (!code) return; await api.put(`/api/wines/${w.id}/barcode`, { barcode: code }); toast('Streepjescode gekoppeld', 'ok'); reload(); } catch (e) { toast(e.message, 'error'); } } }),
         el('a', { class: 'btn secondary sm', href: `#/wijn/${w.id}/bewerken`, text: '✎ Bewerken' }))));
 
     // Hero
@@ -56,6 +58,7 @@ export async function render(main, { params, navigate }) {
     add('Stijl', [w.sweetness, w.body && `${w.body} van body`, w.tannin && `tannine ${w.tannin}`, w.acidity && `zuren ${w.acidity}`].filter(Boolean).join(' · '));
     add('Serveren', [w.serving_temp, w.decant_minutes ? `${w.decant_minutes} min decanteren` : null].filter(Boolean).join(' · '));
     add('Locatie', w.locations);
+    add('Streepjescode', w.barcode);
     const priceInfo = [];
     const paid = inCellar.filter((b) => b.price !== null && !b.gifted).map((b) => b.price);
     if (paid.length) priceInfo.push(`betaald gem. ${money(paid.reduce((a, b) => a + b, 0) / paid.length)}`);
@@ -269,6 +272,24 @@ function editBottleDialog(w, b, reload) {
   });
 }
 
+// "Laatste fles" van een favoriet: op de verlanglijst zetten?
+function lastBottleDialog(lb) {
+  modal({
+    title: 'Dat was de laatste fles',
+    body: el('div', {}, el('p', {}, el('strong', { text: wineTitle(lb) }), ` is op. ${lb.favorite ? 'Een favoriet' : `Jullie gaven gemiddeld ${Math.round(lb.avg_rating)} punten`}${lb.on_wishlist ? ' — staat al op de verlanglijst.' : '. Op de verlanglijst zetten zodat je hem niet vergeet bij te kopen?'}`)),
+    actions: [{ label: 'Nee, bedankt', class: 'ghost' }, lb.on_wishlist ? null : { label: '📝 Op de verlanglijst', class: 'gold', onClick: async () => { await api.post('/api/wishlist', { name: lb.name, producer: lb.producer, vintage: null, note: `Laatste fles gedronken; score ${lb.avg_rating ? Math.round(lb.avg_rating) : '-'}` }); toast('Toegevoegd aan de verlanglijst', 'ok'); } }].filter(Boolean),
+  });
+}
+
+// Cadeau geopend: gever bedanken?
+function giftThanksDialog(b) {
+  modal({
+    title: '🎁 Cadeau geopend',
+    body: el('p', { text: `Deze fles kreeg je van ${b.gifted_from}${b.gift_occasion ? ` (${b.gift_occasion})` : ''}. Leuk om een berichtje of foto te sturen! Markeer als bedankt zodra dat gedaan is.` }),
+    actions: [{ label: 'Later', class: 'ghost' }, { label: 'Bedankt ✓', class: 'gold', onClick: async () => { await api.patch(`/api/gifts/${b.id}`, { gift_thanked: true }); toast('Gemarkeerd als bedankt', 'ok'); } }],
+  });
+}
+
 // Melding bij een dubbele wijn. Geeft terug: 'merge' (flessen bijboeken), 'separate' (bewust apart) of null (annuleren).
 export function duplicateDialog(dup, { allowSeparate = true, quantity = 1 } = {}) {
   return new Promise((resolve) => {
@@ -374,9 +395,11 @@ function removeBottleDialog(w, b, reload) {
     actions: [{ label: 'Annuleren', class: 'ghost' }, { label: 'Bevestigen', class: 'gold', onClick: async () => {
       const payload = { reason: reason.value, date: date.value, note: note.value };
       if (reason.value === 'consumed' && withTasting.input.checked) payload.tasting = tasting.values();
-      await api.post(`/api/wines/${w.id}/bottles/${b.id}/remove`, payload);
+      const res = await api.post(`/api/wines/${w.id}/bottles/${b.id}/remove`, payload);
       toast(reason.value === 'consumed' ? 'Proost! Fles naar de historie verplaatst.' : 'Fles naar de historie verplaatst', 'ok');
       reload();
+      if (res.last_bottle) setTimeout(() => lastBottleDialog(res.last_bottle), 300);
+      else if (b.gifted && b.gifted_from && reason.value === 'consumed') setTimeout(() => giftThanksDialog(b), 300);
     } }],
   });
 }

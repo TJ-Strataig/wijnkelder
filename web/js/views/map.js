@@ -23,24 +23,35 @@ export async function render(main) {
   main.append(status, mapEl, legend, detail);
 
   const sourceSel = select([['topo', 'Topografisch'], ['street', 'Stratenkaart']], { 'aria-label': 'Kaartstijl', style: { width: 'auto' } });
+  const layerSel = select([['cellar', 'In de kelder'], ['consumed', 'Gedronken'], ['both', 'Beide']], { 'aria-label': 'Laag', style: { width: 'auto' } });
   const geoBtn = el('button', { class: 'btn secondary sm', type: 'button', text: 'Locaties bepalen' });
   const info = el('span', { class: 'small muted' });
-  status.append(info, el('div', { class: 'row' }, sourceSel, geoBtn));
+  status.append(info, el('div', { class: 'row' }, layerSel, sourceSel, geoBtn));
+  layerSel.addEventListener('change', () => load(true));
 
   const map = new MiniMap(mapEl, { center: [46, 6], zoom: 4, onMarkerClick: (items, at) => showLocation(items) });
   mapInstance = map;
   sourceSel.addEventListener('change', () => map.setSource(sourceSel.value));
 
   for (const [t, c] of Object.entries(TYPE_COLORS)) legend.append(el('span', {}, el('span', { class: 'dot', style: { background: c } }), typeLabel(t)));
+  legend.append(el('span', {}, el('span', { class: 'dot', style: { background: '#8a8a8a' } }), 'gedronken (laag "Gedronken")'));
 
   let data = { located: [], missing: [] };
   async function load(fit = true) {
     data = await api.get('/api/map');
-    const markers = data.located.map((w) => ({ lat: w.lat, lon: w.lon, label: wineTitle(w), count: w.bottles, color: TYPE_COLORS[w.type] || TYPE_COLORS.overig, data: w }));
+    const layer = layerSel.value;
+    let markers = layer === 'consumed' ? [] : data.located.map((w) => ({ lat: w.lat, lon: w.lon, label: wineTitle(w), count: w.bottles, color: TYPE_COLORS[w.type] || TYPE_COLORS.overig, data: w }));
+    if (layer !== 'cellar') {
+      const c = await api.get('/api/map/consumed');
+      const inCellar = new Set(data.located.map((w) => w.id));
+      for (const w of c.consumed) if (layer === 'consumed' || !inCellar.has(w.id)) markers.push({ lat: w.lat, lon: w.lon, label: wineTitle(w), count: w.bottles, color: '#8a8a8a', data: { ...w, consumed: true, bottles: w.bottles } });
+      const visited = c.countries.filter((x) => x.consumed > 0).map((x) => x.country);
+      info.textContent = `${markers.length} locaties · ${visited.length} landen geproefd: ${visited.slice(0, 8).join(', ')}${visited.length > 8 ? '…' : ''}`;
+    }
     map.setMarkers(markers);
     if (fit && markers.length) map.fitMarkers();
     const bottles = data.located.reduce((s, w) => s + w.bottles, 0);
-    info.textContent = `${data.located.length} wijnen (${bottles} flessen) op de kaart` + (data.missing.length ? ` · ${data.missing.length} zonder locatie` : '');
+    if (layer === 'cellar') info.textContent = `${data.located.length} wijnen (${bottles} flessen) op de kaart` + (data.missing.length ? ` · ${data.missing.length} zonder locatie` : '');
     geoBtn.hidden = !data.missing.length;
     geoBtn.textContent = `Locaties bepalen (${data.missing.length})`;
     if (!data.located.length && !data.missing.length) {
@@ -88,7 +99,7 @@ export async function render(main) {
     for (const w of wines) {
       grid.append(el('a', { class: 'card', href: `#/wijn/${w.id}`, style: { textDecoration: 'none', color: 'inherit' } },
         el('strong', { text: `${TYPE_ICONS[w.type] || ''} ${w.name}${w.vintage ? ' ' + w.vintage : ''}` }),
-        el('div', { class: 'small muted', text: [w.producer, w.appellation || w.region, `${w.bottles} fles${w.bottles === 1 ? '' : 'sen'}`].filter(Boolean).join(' · ') })));
+        el('div', { class: 'small muted', text: [w.producer, w.appellation || w.region, `${w.bottles} fles${w.bottles === 1 ? '' : 'sen'}${w.consumed ? ' gedronken' : ''}`, w.avg_rating ? `score ${Math.round(w.avg_rating)}` : null].filter(Boolean).join(' · ') })));
     }
     detail.append(grid);
     for (const p of producers) detail.append(producerPanel(p, { compact: false, onUpdated: () => load(false) }));

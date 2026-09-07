@@ -1,5 +1,6 @@
 // Startpunt van de webapp: routering, navigatie, thema en sessiebewaking.
-import { el, clear, toast } from './util.js';
+import { el, clear, toast, modal, fmtDateTime } from './util.js';
+import { api } from './api.js';
 import { session } from './api.js';
 import { logout } from './auth.js';
 import { invalidateWines } from './data.js';
@@ -15,12 +16,15 @@ import * as admin from './views/admin.js';
 import * as settings from './views/settings.js';
 import * as mapView from './views/map.js';
 import * as bulk from './views/bulk.js';
+import * as tonight from './views/tonight.js';
+import * as insights from './views/insights.js';
+import * as manage from './views/manage.js';
 import * as producers from './views/producers.js';
 
 const NAV = [
   { path: '/kelder', label: 'Kelder', ico: '🍷' },
   { path: '/toevoegen', label: 'Toevoegen', ico: '＋' },
-  { path: '/spijs', label: 'Spijs & wijn', ico: '🍽️' },
+  { path: '/vanavond', label: 'Vanavond', ico: '🥂' },
   { path: '/historie', label: 'Historie', ico: '📜' },
   { path: '/meer', label: 'Meer', ico: '☰' },
 ];
@@ -32,6 +36,9 @@ const ROUTES = [
   { pattern: /^\/wijn\/([^/]+)$/, view: wine },
   { pattern: /^\/toevoegen$/, view: add },
   { pattern: /^\/bulk$/, view: bulk },
+  { pattern: /^\/vanavond$/, view: tonight },
+  { pattern: /^\/inzichten$/, view: insights },
+  { pattern: /^\/voorraad$/, view: manage },
   { pattern: /^\/wijn\/([^/]+)\/bewerken$/, view: add, mode: 'edit' },
   { pattern: /^\/historie$/, view: history },
   { pattern: /^\/spijs$/, view: pairing },
@@ -59,20 +66,25 @@ function renderNav(active) {
   const side = document.getElementById('sidenav');
   const bottom = document.getElementById('bottomnav');
   clear(side); clear(bottom);
-  const items = [...NAV.filter((n) => n.path !== '/meer'), { path: '/bulk', label: 'Bulk', ico: '📷' }, { path: '/herkomst', label: 'Herkomst', ico: '🗺️' }, { path: '/wijnhuizen', label: 'Wijnhuizen', ico: '🏡' }, { path: '/statistieken', label: 'Statistieken', ico: '📊' }, { path: '/verlanglijst', label: 'Verlanglijst', ico: '📝' }];
+  const items = [...NAV.filter((n) => n.path !== '/meer'), { path: '/spijs', label: 'Spijs & wijn', ico: '🍽️' }, { path: '/inzichten', label: 'Inzichten', ico: '👅' }, { path: '/voorraad', label: 'Voorraad', ico: '🛒' }, { path: '/bulk', label: 'Bulk', ico: '📷' }, { path: '/herkomst', label: 'Herkomst', ico: '🗺️' }, { path: '/wijnhuizen', label: 'Wijnhuizen', ico: '🏡' }, { path: '/statistieken', label: 'Statistieken', ico: '📊' }, { path: '/verlanglijst', label: 'Verlanglijst', ico: '📝' }];
   if (user?.role === 'admin') items.push({ path: '/beheer', label: 'Beheer', ico: '👥' });
   items.push({ path: '/instellingen', label: 'Instellingen', ico: '⚙️' });
   for (const n of items) side.append(el('a', { href: `#${n.path}`, class: active === n.path ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));
   for (const n of NAV) {
-    const isActive = active === n.path || (n.path === '/meer' && ['/bulk', '/herkomst', '/wijnhuizen', '/statistieken', '/verlanglijst', '/beheer', '/instellingen'].includes(active));
+    const isActive = active === n.path || (n.path === '/meer' && ['/spijs', '/inzichten', '/voorraad', '/bulk', '/herkomst', '/wijnhuizen', '/statistieken', '/verlanglijst', '/beheer', '/instellingen'].includes(active));
     bottom.append(el('a', { href: `#${n.path}`, class: isActive ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));
   }
   document.getElementById('user-chip').textContent = user ? user.name : '';
+  refreshBell();
 }
 
 function renderMore(main) {
   const user = session.user;
   const links = [
+    ['/spijs', '🍽️', 'Spijs & wijn', 'Welke wijn bij welk gerecht — en andersom'],
+    ['/inzichten', '👅', 'Inzichten', 'Smaakprofiel van Angela en Tije, prijs-kwaliteit, jaaroverzicht'],
+    ['/voorraad', '🛒', 'Voorraad & beheer', 'Aankooplijst met budget, inventarisatie, cadeau-register'],
+    ['/vanavond?tab=restaurant', '🍽️', 'Restaurant-modus', 'Wijnkaart fotograferen en advies krijgen'],
     ['/bulk', '📷', 'Bulk toevoegen', 'Meerdere etiketfoto\'s tegelijk; direct of later per fles goedkeuren'],
     ['/bulk?tab=queue', '🗂️', 'Beoordelingswachtrij', 'Flessen die nog gecontroleerd en goedgekeurd moeten worden'],
     ['/herkomst', '🗺️', 'Herkomst', 'Topografische kaart: waar komen onze wijnen vandaan?'],
@@ -88,6 +100,29 @@ function renderMore(main) {
       el('div', {}, el('strong', { text: t }), el('div', { class: 'muted small', text: d }))))),
     el('button', { class: 'btn ghost block', type: 'button', onClick: async () => { await logout(); navigate('/login'); }, text: 'Uitloggen' }));
 }
+
+// Meldingen (in-app inbox) in de bovenbalk
+let bellTimer = null;
+async function refreshBell() {
+  const bell = document.getElementById('bell'); if (!bell || !session.token) return;
+  try {
+    const { unread } = await api.get('/api/notifications');
+    bell.dataset.count = unread || '';
+    bell.title = unread ? `${unread} nieuwe melding${unread === 1 ? '' : 'en'}` : 'Meldingen';
+  } catch { /* stil */ }
+}
+window.addEventListener('DOMContentLoaded', () => {
+  const bell = document.getElementById('bell');
+  bell?.addEventListener('click', async () => {
+    const { notifications } = await api.get('/api/notifications');
+    const body = el('div', { class: 'stack' });
+    if (!notifications.length) body.append(el('p', { class: 'muted', text: 'Nog geen meldingen. Zet in Instellingen de wekelijkse sommelier-tip en drinkvenster-meldingen aan.' }));
+    for (const n of notifications) body.append(el('div', { class: 'note', style: n.read_at ? { opacity: 0.7 } : {} }, el('strong', { text: n.title }), el('div', { class: 'small', text: n.body || '' }), el('div', { class: 'row between small muted' }, el('span', { text: fmtDateTime(n.created_at) }), n.link ? el('a', { href: n.link, text: 'Openen →' }) : null)));
+    modal({ title: 'Meldingen', body, actions: [{ label: 'Sluiten' }], onClose: refreshBell });
+    await api.post('/api/notifications/read');
+  });
+  bellTimer = setInterval(refreshBell, 5 * 60 * 1000);
+});
 
 let currentView = null;
 async function render() {

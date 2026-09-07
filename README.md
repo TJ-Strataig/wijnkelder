@@ -36,6 +36,20 @@ alle leden zien en beheren dezelfde collectie.
 - Locaties worden automatisch bepaald (knop *Locaties bepalen*): eerst het wijnhuis zelf, anders appellatie, streek of land — de nauwkeurigheid staat erbij.
 - **Wijnhuizen** (in het menu): alle producenten uit de kelder, met een door de AI geschreven profiel (geschiedenis, ligging, eigenaar, wijnmaker, hectares, filosofie, bekendste wijnen, website) en ruimte voor eigen notities. Ook zichtbaar op de wijnpagina en op de kaart.
 
+**Slimme functies**
+- **Vanavond** — één tik en de huissommelier kiest drie flessen uit de kelder: een veilige keuze, een verrassing en iets dat nu open moet. Rekening houdend met dag, seizoen, wat je recent dronk, jullie scores en drinkvensters.
+- **Restaurant-modus** — fotografeer de wijnkaart; de sommelier markeert wat jullie kennen (met eigen score) en adviseert op basis van smaakprofiel, gerecht en budget.
+- **Sommelier-push** — wekelijkse tip voor het weekend, drinkvenster-meldingen (maandag) en voorraadtekorten (zaterdag), als pushmelding op de telefoon én in de 🔔-inbox in de app. Dag en tijd zelf instelbaar.
+- **Smaakprofielen** — per persoon: scores per type, druif, land, streek en body; waar Angela en Tije verschillen; gedeelde favorieten.
+- **Prijs & kwaliteit** — welke wijnen gaven de meeste punten voor hun geld, welke vielen tegen; grafiek prijs tegenover score.
+- **Jaaroverzicht** — flessen gedronken/gekocht/gekregen, uitgegeven, beste fles, oudste fles, meest gedronken, per maand/type/land/gelegenheid/plek.
+- **Aankooplijst met budget** — voorraaddoelen ("min. 6 doordeweekse witte onder € 12"); tekorten, geschatte kosten en suggesties uit wijnen die eerder goed scoorden.
+- **Inventarisatie** — telronde: verwacht vs. geteld per wijn, verschillen zichtbaar, ontbrekende flessen desgewenst afboeken.
+- **Cadeau-register** — gekregen flessen per gever, gelegenheid, en een herinnering om te bedanken na het openen.
+- **Streepjescode** — scan de EAN met de camera: bestaande wijn direct gevonden (bijboeken), anders productgegevens als startpunt.
+- **Laatste fles** — bij het openen van de laatste fles van een favoriet: met één tik op de verlanglijst.
+- **Herkomstkaart met "gedronken"-laag** — zie ook waar jullie al geweest zijn en hoeveel landen jullie geproefd hebben.
+
 **Statistieken**: flessen, wijnen, aankoopwaarde en geschatte waarde (incl. prijsindicatie voor gekregen flessen), gedronken, gekregen, verdeling per type/land/jaargang, gedronken per maand, en drinkvenster-overzichten (*nu drinken*, *snel drinken*, *over hoogtepunt*, *te jong*).
 
 **Extra's, geïnspireerd op wat CellarTracker, Vivino, InVintory, Cellarion en Sommo bieden**
@@ -155,15 +169,27 @@ Voeg in de repository onder **Settings → Secrets and variables → Actions** t
 Nieuwe versies vervangen alleen code; jullie wijnen, gebruikers en foto's blijven staan. Wanneer een update een **databasemigratie** meebrengt (staat in `api/migrations/`), voer die dan één keer uit — migraties voegen alleen toe en verwijderen niets:
 ```bash
 cd api
-npx wrangler d1 execute wijnkelder --remote --file=./migrations/0003_wachtrij.sql -y
+npx wrangler d1 execute wijnkelder --remote --file=./migrations/0004_slim.sql -y
 npm run deploy
 ```
+
+### Pushmeldingen inschakelen (optioneel)
+Meldingen verschijnen altijd in de app (🔔). Voor échte pushmeldingen op de telefoon heeft de server eenmalig een sleutelpaar nodig:
+```bash
+cd api
+node scripts/vapid.mjs                       # toont twee sleutels
+npx wrangler secret put VAPID_PUBLIC_KEY     # plak de publieke sleutel
+npx wrangler secret put VAPID_PRIVATE_KEY    # plak de privésleutel
+npx wrangler secret put VAPID_SUBJECT        # bijv. mailto:tije@voorbeeld.nl
+npm run deploy
+```
+Daarna in de app: *Instellingen → Meldingen → Pushmeldingen inschakelen* (op de iPhone werkt dit alleen als de app op het beginscherm staat en daarvandaan is geopend).
 
 ## Tests
 ```bash
 cd api && npm test
 ```
-Draait 25 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
+Draait 27 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
 
 ## Lokaal ontwikkelen
 ```bash

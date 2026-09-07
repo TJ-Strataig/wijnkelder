@@ -1,8 +1,9 @@
 // Wijn toevoegen (via foto of handmatig) en bewerken.
-import { el, clear, field, input, select, checkbox, toast, TYPE_LABELS, shrinkImage, wineTitle } from '../util.js';
+import { el, clear, field, input, select, checkbox, toast, confirmDialog, TYPE_LABELS, shrinkImage, wineTitle } from '../util.js';
 import { api, photoUrl } from '../api.js';
 import { loadWines, invalidateWines } from '../data.js';
 import { bottleForm, destinationForm, duplicateDialog } from './wine.js';
+import { scanBarcode } from '../barcode.js';
 
 export async function render(main, { params, mode, navigate }) {
   const editing = mode === 'edit';
@@ -29,6 +30,21 @@ export async function render(main, { params, mode, navigate }) {
   const preview = el('img', { class: 'preview', alt: 'Voorbeeld van het etiket', hidden: !labelPreviewUrl, src: labelPreviewUrl || null });
   const hint = input({ placeholder: 'Optionele aanwijzing voor de AI, bijv. "achteretiket" of "jaargang 2019"', maxlength: 300 });
   const recognizeBtn = el('button', { class: 'btn gold', type: 'button', text: '✨ Herken wijn vanaf foto', disabled: true });
+  const barcodeBtn = el('button', { class: 'btn secondary', type: 'button', text: '▥ Streepjescode', title: 'Scan de streepjescode op het etiket' });
+  barcodeBtn.addEventListener('click', async () => {
+    try {
+      const code = await scanBarcode(); if (!code) return;
+      draft.barcode = code;
+      const r = await api.get(`/api/barcode?code=${encodeURIComponent(code)}`);
+      if (r.found) {
+        const go = await confirmDialog('Wijn al bekend', `Deze streepjescode hoort bij "${r.wine.name}" (${r.wine.bottles_in_cellar} in de kelder). Flessen daar bijboeken?`, { okLabel: 'Naar die wijn' });
+        if (go) navigate(`/wijn/${r.wine.id}`);
+        return;
+      }
+      if (r.hint) { for (const [k, v] of Object.entries({ name: r.hint.name, producer: r.hint.producer, country: r.hint.country })) if (v && !draft[k]) draft[k] = v; fillForm(); toast('Code onbekend in de kelder; productgegevens als startpunt ingevuld', 'ok'); }
+      else toast(`Streepjescode ${code} vastgelegd; herken het etiket of vul de gegevens in`, 'ok');
+    } catch (e) { toast(e.message, 'error'); }
+  });
   const statusLine = el('div', { class: 'small muted' });
   let photo = null; // { blob, dataUrl }
 
@@ -70,7 +86,7 @@ export async function render(main, { params, mode, navigate }) {
     } finally { recognizeBtn.disabled = false; recognizeBtn.textContent = '✨ Herken wijn vanaf foto'; }
   }
   recognizeBtn.addEventListener('click', recognize);
-  photoCard.append(drop, fileInput, preview, el('div', { class: 'row', style: { marginTop: '0.7rem' } }, el('div', { class: 'grow' }, hint), recognizeBtn), statusLine);
+  photoCard.append(drop, fileInput, preview, el('div', { class: 'row', style: { marginTop: '0.7rem' } }, el('div', { class: 'grow' }, hint), recognizeBtn, editing ? null : barcodeBtn), statusLine);
   wrap.append(photoCard);
 
   // ---- Stap 2: gegevens -------------------------------------------------------

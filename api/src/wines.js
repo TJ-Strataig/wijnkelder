@@ -1,4 +1,5 @@
 // Wijnen, flessen, proefnotities, historie, verlanglijst, statistieken, export en foto's.
+import { maybeLastBottle } from './sommelier.js';
 import {
   HttpError, json, noContent, readJson, uuid, nowIso, str, num, bool, strArray, oneOf, isoDate,
   WINE_TYPES, BOTTLE_REMOVE_REASONS, signPhotoUrl, verifyPhotoSig, isValidPhotoKey, safeHttpsUrl, logActivity, SECURITY_HEADERS,
@@ -94,6 +95,7 @@ function wineFields(body) {
     estimated_price_min: num(body.estimated_price_min, { min: 0, max: 1e6 }),
     estimated_price_max: num(body.estimated_price_max, { min: 0, max: 1e6 }),
     estimated_price_source: body.estimated_price_source ? JSON.stringify(sanitizePriceSource(body.estimated_price_source)) : null,
+    barcode: body.barcode === undefined || body.barcode === null || body.barcode === '' ? null : String(body.barcode).replace(/\D/g, '').slice(0, 20) || null,
   };
 }
 
@@ -338,7 +340,11 @@ export async function removeBottle(req, env, { user, params }) {
     await insertTasting(env, user, b.wine_id, b.id, body.tasting);
   }
   await logActivity(env, user.id, 'bottle.removed', 'wine', b.wine_id, { name: b.name, reason });
-  return getWine(req, env, { params: { id: b.wine_id } });
+  const res = await getWine(req, env, { params: { id: b.wine_id } });
+  const last = await maybeLastBottle(env, b.wine_id);
+  if (!last) return res;
+  const data = await res.json();
+  return json({ ...data, last_bottle: last });
 }
 
 export async function restoreBottle(req, env, { user, params }) {

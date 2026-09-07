@@ -6,6 +6,8 @@ import * as wines from './wines.js';
 import * as ai from './ai.js';
 import * as origin from './origin.js';
 import * as intake from './intake.js';
+import * as insights from './insights.js';
+import * as som from './sommelier.js';
 
 const routes = [];
 function route(method, pattern, handler, { auth: needsAuth = true, admin = false } = {}) {
@@ -68,6 +70,30 @@ route('PATCH',  '/api/intake/:id', intake.updateIntake);
 route('POST',   '/api/intake/:id/approve', intake.approveIntake);
 route('DELETE', '/api/intake/:id', intake.deleteIntake);
 
+route('GET',    '/api/insights/taste', insights.tasteProfiles);
+route('GET',    '/api/insights/price-quality', insights.priceQuality);
+route('GET',    '/api/insights/year', insights.yearReview);
+route('GET',    '/api/targets', insights.listTargets);
+route('POST',   '/api/targets', insights.createTarget);
+route('DELETE', '/api/targets/:id', insights.deleteTarget);
+route('POST',   '/api/inventory/start', insights.startInventory);
+route('POST',   '/api/inventory/:id/finish', insights.finishInventory);
+route('GET',    '/api/inventory', insights.inventoryHistory);
+route('GET',    '/api/gifts', insights.gifts);
+route('PATCH',  '/api/gifts/:bottleId', insights.updateGift);
+route('GET',    '/api/barcode', insights.lookupBarcode);
+route('PUT',    '/api/wines/:id/barcode', insights.setBarcode);
+route('GET',    '/api/map/consumed', insights.mapConsumed);
+route('GET',    '/api/notifications', insights.listNotifications);
+route('POST',   '/api/notifications/read', insights.markNotificationsRead);
+route('GET',    '/api/notifications/prefs', som.getNotificationPrefs);
+route('PUT',    '/api/notifications/prefs', som.setNotificationPrefs);
+route('POST',   '/api/notifications/subscribe', som.subscribePush);
+route('DELETE', '/api/notifications/subscribe/:id', som.unsubscribePush);
+route('POST',   '/api/notifications/test', som.testPush);
+route('POST',   '/api/sommelier/tonight', som.tonight);
+route('POST',   '/api/sommelier/restaurant', som.restaurant);
+
 route('GET',    '/api/map', origin.mapData);
 route('POST',   '/api/map/geocode', origin.geocode);
 route('PUT',    '/api/wines/:id/location', origin.setWineLocation);
@@ -129,8 +155,9 @@ export default {
     }
   },
 
-  // Dagelijkse opruiming van verlopen sessies, challenges en uitnodigingen.
-  async scheduled(event, env) {
+  // Elk uur: meldingen (wekelijkse sommelier-push, drinkvensters, voorraad); dagelijks opruimen.
+  async scheduled(event, env, ctx) {
+    try { await som.runScheduledNotifications(env); } catch (e) { console.error('notifications', e); }
     const now = new Date().toISOString();
     await env.DB.batch([
       env.DB.prepare('DELETE FROM sessions WHERE expires_at < ? OR absolute_expires_at < ?').bind(now, now),

@@ -1,10 +1,10 @@
 // Service worker: maakt de app installeerbaar en laadt de schil offline. API-verzoeken worden nooit gecachet.
-const CACHE = 'wijnkelder-shell-v1';
+const CACHE = 'wijnkelder-shell-v2';
 const SHELL = [
   './', './index.html', './config.js', './manifest.webmanifest', './css/app.css', './icons/icon.svg', './icons/apple-touch-icon.png',
   './js/app.js', './js/api.js', './js/auth.js', './js/util.js', './js/pairings.js', './js/data.js',
   './js/views/login.js', './js/views/cellar.js', './js/views/wine.js', './js/views/add.js', './js/views/history.js',
-  './js/views/pairing.js', './js/views/stats.js', './js/views/wishlist.js', './js/views/admin.js', './js/views/settings.js', './js/views/map.js', './js/views/bulk.js', './js/views/producers.js', './js/minimap.js',
+  './js/views/pairing.js', './js/views/stats.js', './js/views/wishlist.js', './js/views/admin.js', './js/views/settings.js', './js/views/map.js', './js/views/bulk.js', './js/views/tonight.js', './js/views/insights.js', './js/views/manage.js', './js/barcode.js', './js/views/producers.js', './js/minimap.js',
 ];
 
 self.addEventListener('install', (e) => {
@@ -27,4 +27,18 @@ self.addEventListener('fetch', (e) => {
       })
       .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html')))
   );
+});
+
+// Pushmeldingen
+self.addEventListener('push', (e) => {
+  let data = {}; try { data = e.data ? e.data.json() : {}; } catch { data = { title: 'Wijnkelder', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(data.title || 'Wijnkelder', { body: data.body || '', icon: './icons/icon-192.png', badge: './icons/icon-192.png', data: { link: data.link || '#/kelder' }, tag: data.tag || 'wijnkelder' }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const target = new URL('./' + (e.notification.data?.link || '#/kelder'), self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) if (c.url.startsWith(self.registration.scope)) { c.navigate(target); return c.focus(); }
+    return self.clients.openWindow(target);
+  }));
 });

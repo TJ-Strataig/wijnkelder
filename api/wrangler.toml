@@ -39,4 +39,4 @@ bucket_name = "wijnkelder-fotos"
 enabled = true
 
 [triggers]
-crons = ["30 3 * * *"]
+crons = ["0 * * * *"]

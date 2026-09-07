@@ -1,5 +1,5 @@
 // Instellingen: eigen passkeys, uitloggen, export.
-import { el, clear, field, input, select, modal, confirmDialog, toast, fmtDateTime, download } from '../util.js';
+import { el, clear, field, input, select, checkbox, modal, confirmDialog, toast, fmtDateTime, download } from '../util.js';
 import { api, session } from '../api.js';
 import { addPasskey, logout, deviceLabel } from '../auth.js';
 
@@ -120,6 +120,45 @@ export async function render(main, { navigate }) {
   }
   loadAi();
 
+  // Meldingen
+  const nt = el('div', { class: 'card' });
+  main.append(nt);
+  async function loadNotif() {
+    clear(nt);
+    nt.append(el('h2', { style: { marginTop: 0 }, text: 'Meldingen' }));
+    let d; try { d = await api.get('/api/notifications/prefs'); } catch (e) { nt.append(el('p', { class: 'badge bad', text: e.message })); return; }
+    const p = d.prefs;
+    const day = select([['', 'Uit'], ['5', 'Vrijdag'], ['6', 'Zaterdag'], ['4', 'Donderdag'], ['0', 'Zondag'], ['1', 'Maandag'], ['2', 'Dinsdag'], ['3', 'Woensdag']], { value: p.weekly_day === null || p.weekly_day === undefined ? '' : String(p.weekly_day) });
+    const hour = select(Array.from({ length: 24 }, (_, h) => [String(h), `${String(h).padStart(2, '0')}:00`]), { value: String(p.weekly_hour ?? 17) });
+    const win = checkbox('Drinkvenster-meldingen (maandagochtend: wat nu op dreef is en wat snel op moet)', { checked: !!p.drink_window });
+    const low = checkbox('Voorraadtekorten (zaterdagochtend, op basis van de aankooplijst)', { checked: !!p.low_stock });
+    const save = el('button', { class: 'btn sm', type: 'button', text: 'Voorkeuren opslaan', onClick: async () => { await api.put('/api/notifications/prefs', { weekly_day: day.value === '' ? null : Number(day.value), weekly_hour: Number(hour.value), drink_window: win.input.checked, low_stock: low.input.checked }); toast('Opgeslagen', 'ok'); } });
+    nt.append(el('div', { class: 'form-grid' }, field('Wekelijkse sommelier-tip', day, { hint: 'Een fles-suggestie voor het weekend uit jullie eigen kelder' }), field('Tijdstip', hour)), win.wrap, low.wrap, el('div', { style: { marginTop: '0.5rem' } }, save));
+    nt.append(el('h3', { text: 'Pushmeldingen op dit apparaat' }));
+    if (!d.push_available) nt.append(el('p', { class: 'small muted', text: 'Pushmeldingen zijn nog niet ingesteld op de server (VAPID-sleutels ontbreken). Meldingen verschijnen wel in de app onder 🔔. Zie de README voor het inschakelen van push.' }));
+    else if (!('serviceWorker' in navigator) || !('PushManager' in window)) nt.append(el('p', { class: 'small muted', text: 'Deze browser ondersteunt geen pushmeldingen. Op de iPhone: zet de app op het beginscherm en open hem daarvandaan.' }));
+    else {
+      const reg = await navigator.serviceWorker.ready;
+      const current = await reg.pushManager.getSubscription();
+      const isOn = !!current;
+      nt.append(el('p', { class: 'small muted', text: isOn ? 'Dit apparaat ontvangt pushmeldingen.' : 'Schakel pushmeldingen in om de sommelier-tip en waarschuwingen ook buiten de app te ontvangen.' }));
+      nt.append(el('div', { class: 'row' },
+        el('button', { class: `btn ${isOn ? 'ghost' : 'gold'} sm`, type: 'button', text: isOn ? 'Uitschakelen op dit apparaat' : '🔔 Pushmeldingen inschakelen', onClick: async () => {
+          try {
+            if (isOn) { const subs = d.subscriptions; await current.unsubscribe(); for (const s of subs) await api.del(`/api/notifications/subscribe/${s.id}`).catch(() => {}); toast('Uitgeschakeld'); }
+            else {
+              const perm = await Notification.requestPermission(); if (perm !== 'granted') return toast('Geen toestemming voor meldingen', 'error');
+              const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(d.vapid_public_key) });
+              await api.post('/api/notifications/subscribe', { subscription: sub.toJSON(), label: deviceLabel() }); toast('Pushmeldingen ingeschakeld', 'ok');
+            }
+            loadNotif();
+          } catch (e) { toast(e.message, 'error'); }
+        } }),
+        isOn ? el('button', { class: 'btn secondary sm', type: 'button', text: 'Testmelding sturen', onClick: async () => { const r = await api.post('/api/notifications/test'); toast(r.sent ? 'Testmelding verstuurd' : 'Geen apparaat bereikt', r.sent ? 'ok' : 'error'); } }) : null));
+    }
+  }
+  loadNotif();
+
   // Export
   const ex = el('div', { class: 'card' });
   ex.append(el('h2', { style: { marginTop: 0 }, text: 'Gegevens exporteren' }), el('p', { class: 'small muted', text: 'Jullie data is van jullie. Download een volledige kopie (JSON) of een spreadsheet-vriendelijke lijst (CSV, te openen in Excel).' }));
@@ -137,4 +176,11 @@ export async function render(main, { navigate }) {
   main.append(se);
 
   main.append(el('p', { class: 'muted small center', style: { marginTop: '2rem' }, text: 'Wijnkelder · gebouwd voor Angela & Tije 🍷' }));
+}
+
+
+function urlB64ToUint8Array(s) {
+  const pad = '='.repeat((4 - (s.length % 4)) % 4);
+  const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
