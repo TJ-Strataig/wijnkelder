@@ -73,7 +73,8 @@ function renderNav(active) {
 function renderMore(main) {
   const user = session.user;
   const links = [
-    ['/bulk', '📷', 'Bulk toevoegen', 'Meerdere etiketfoto\'s tegelijk, per fles controleren en goedkeuren'],
+    ['/bulk', '📷', 'Bulk toevoegen', 'Meerdere etiketfoto\'s tegelijk; direct of later per fles goedkeuren'],
+    ['/bulk?tab=queue', '🗂️', 'Beoordelingswachtrij', 'Flessen die nog gecontroleerd en goedgekeurd moeten worden'],
     ['/herkomst', '🗺️', 'Herkomst', 'Topografische kaart: waar komen onze wijnen vandaan?'],
     ['/wijnhuizen', '🏡', 'Wijnhuizen', 'Informatie over de producenten in onze kelder'],
     ['/statistieken', '📊', 'Statistieken', 'Waarde, verdeling, wat nu drinken'],

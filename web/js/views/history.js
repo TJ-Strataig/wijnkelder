@@ -7,7 +7,7 @@ const ACTION_LABELS = {
   'wine.created': 'voegde een wijn toe', 'wine.updated': 'bewerkte een wijn', 'wine.deleted': 'verwijderde een wijn', 'bottles.added': 'voegde flessen toe',
   'bottle.removed': 'haalde een fles uit de kelder', 'bottle.restored': 'zette een fles terug', 'tasting.added': 'schreef een proefnotitie', 'user.registered': 'werd lid van het huishouden',
   'user.login': 'logde in', 'invite.created': 'maakte een uitnodiging', 'invite.revoked': 'trok een uitnodiging in', 'user.updated': 'wijzigde een gebruiker', 'user.removed': 'verwijderde een gebruiker',
-  'passkey.added': 'voegde een passkey toe', 'passkey.removed': 'verwijderde een passkey', 'ai.recognize': 'liet een etiket herkennen', 'ai.price': 'haalde een prijsindicatie op', 'ai.settings': 'wijzigde de AI-instellingen', 'producer.profiled': 'vroeg een wijnhuisprofiel op', 'wine.located': 'plaatste een wijn op de kaart',
+  'passkey.added': 'voegde een passkey toe', 'passkey.removed': 'verwijderde een passkey', 'ai.recognize': 'liet een etiket herkennen', 'ai.price': 'haalde een prijsindicatie op', 'ai.settings': 'wijzigde de AI-instellingen', 'producer.profiled': 'vroeg een wijnhuisprofiel op', 'intake.added': 'zette een foto in de beoordelingswachtrij', 'intake.approved': 'keurde een fles uit de wachtrij goed', 'intake.removed': 'verwijderde een item uit de wachtrij', 'intake.cleanup': 'ruimde de wachtrij op', 'wine.located': 'plaatste een wijn op de kaart',
 };
 
 export async function render(main) {

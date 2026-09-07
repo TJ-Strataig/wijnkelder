@@ -96,6 +96,10 @@ CREATE TABLE IF NOT EXISTS wines (
   estimated_price_at TEXT,
   favorite           INTEGER NOT NULL DEFAULT 0,
   notes              TEXT,
+  latitude           REAL,                   -- herkomst (kaart)
+  longitude          REAL,
+  geo_label          TEXT,                   -- wat er is gegeocodeerd
+  geo_precision      TEXT,                   -- producer | appellation | region | country
   created_by         TEXT REFERENCES users(id),
   created_at         TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
@@ -174,3 +178,46 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_by  TEXT REFERENCES users(id),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Producentinformatie (herkomstkaart). Bestaande installaties: zie migrations/0002_herkomst.sql
+
+CREATE TABLE IF NOT EXISTS producers (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  name_key      TEXT NOT NULL UNIQUE,   -- genormaliseerd voor koppeling
+  country       TEXT,
+  region        TEXT,
+  description   TEXT,                   -- AI-profiel (Nederlands)
+  founded       TEXT,
+  owner         TEXT,
+  winemaker     TEXT,
+  hectares      REAL,
+  philosophy    TEXT,                   -- biologisch, biodynamisch, traditioneel, ...
+  signature_wines TEXT,                 -- JSON array
+  website       TEXT,
+  latitude      REAL,
+  longitude     REAL,
+  address       TEXT,
+  sources       TEXT,                   -- JSON: bronnen
+  confidence    REAL,
+  notes         TEXT,                   -- eigen notities van het huishouden
+  updated_by    TEXT REFERENCES users(id),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Beoordelingswachtrij voor bulk-invoer. Bestaande installaties: zie migrations/0003_wachtrij.sql
+CREATE TABLE IF NOT EXISTS intake_queue (
+  id              TEXT PRIMARY KEY,
+  status          TEXT NOT NULL DEFAULT 'pending',
+  label_image_key TEXT,
+  wine            TEXT,
+  bottle          TEXT,
+  confidence      REAL,
+  error           TEXT,
+  batch_label     TEXT,
+  created_by      TEXT REFERENCES users(id),
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  approved_wine_id TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_intake_status ON intake_queue(status);

@@ -5,6 +5,7 @@ import * as auth from './auth.js';
 import * as wines from './wines.js';
 import * as ai from './ai.js';
 import * as origin from './origin.js';
+import * as intake from './intake.js';
 
 const routes = [];
 function route(method, pattern, handler, { auth: needsAuth = true, admin = false } = {}) {
@@ -58,6 +59,13 @@ route('POST',   '/api/ai/price', ai.priceEstimate);
 route('POST',   '/api/ai/pair', ai.pairFromCellar);
 route('POST',   '/api/ai/dishes', ai.dishesForWine);
 route('GET',    '/api/ai/settings', ai.getAiSettings);
+
+route('GET',    '/api/intake', intake.listIntake);
+route('POST',   '/api/intake', intake.addIntake);
+route('POST',   '/api/intake/cleanup', intake.cleanupIntake);
+route('PATCH',  '/api/intake/:id', intake.updateIntake);
+route('POST',   '/api/intake/:id/approve', intake.approveIntake);
+route('DELETE', '/api/intake/:id', intake.deleteIntake);
 
 route('GET',    '/api/map', origin.mapData);
 route('POST',   '/api/map/geocode', origin.geocode);
