@@ -9,9 +9,9 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 # Het exacte adres waar de webapp draait (zonder slash aan het einde).
 # Voorbeeld GitHub Pages: https://tije.github.io
-ORIGIN = "https://TJ-Strataig.github.io"
+ORIGIN = "https://tj-strataig.github.io"
 # De hostnaam van bovenstaand adres. Dit is de "Relying Party ID" voor passkeys.
-RP_ID = "TJ-Strataig.github.io"
+RP_ID = "tj-strataig.github.io"
 RP_NAME = "Wijnkelder van Angela & Tije"
 # AI is standaard in te stellen IN DE APP (Instellingen â†’ AI-sommelier, alleen beheerder):
 # daar kies je Anthropic (Claude) of OpenAI, het model en voer je de API-sleutel in.
