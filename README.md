@@ -27,6 +27,11 @@ alle leden zien en beheren dezelfde collectie.
 - Andersom: kies een wijn → welke gerechten passen.
 - **AI-sommelier**: typ wat je gaat eten en krijg de beste 5 flessen uit de kelder met uitleg en serveertip, rekening houdend met drinkvensters. Op de wijnpagina kan de AI ook gerechten voorstellen.
 
+**Herkomst & wijnhuizen**
+- **Topografische kaart** (OpenTopoMap, omschakelbaar naar stratenkaart) met een speld per wijn, gekleurd op type en met het aantal flessen. Spelden dicht bij elkaar worden gegroepeerd; tik om in te zoomen. Tik op een speld voor de wijnen op die plek en het wijnhuis.
+- Locaties worden automatisch bepaald (knop *Locaties bepalen*): eerst het wijnhuis zelf, anders appellatie, streek of land — de nauwkeurigheid staat erbij.
+- **Wijnhuizen** (in het menu): alle producenten uit de kelder, met een door de AI geschreven profiel (geschiedenis, ligging, eigenaar, wijnmaker, hectares, filosofie, bekendste wijnen, website) en ruimte voor eigen notities. Ook zichtbaar op de wijnpagina en op de kaart.
+
 **Statistieken**: flessen, wijnen, aankoopwaarde en geschatte waarde (incl. prijsindicatie voor gekregen flessen), gedronken, gekregen, verdeling per type/land/jaargang, gedronken per maand, en drinkvenster-overzichten (*nu drinken*, *snel drinken*, *over hoogtepunt*, *te jong*).
 
 **Extra's, geïnspireerd op wat CellarTracker, Vivino, InVintory, Cellarion en Sommo bieden**
@@ -66,8 +71,11 @@ bash setup.sh
 ```powershell
 # Windows PowerShell
 .\setup.ps1
-# bij een 'execution policy'-melding: powershell -ExecutionPolicy Bypass -File .\setup.ps1
+# Mag je geen scripts uitvoeren (beheerde laptop, 'execution policy')? Gebruik dan:
+Get-Content .\setup.ps1 -Raw | Invoke-Expression
 ```
+
+Voor Cloudflare vraagt het script om een **API-token** (op Windows werkt de browser-login vaak niet): maak die aan op dash.cloudflare.com/profile/api-tokens met het sjabloon *Edit Cloudflare Workers*, aangevuld met *D1: Edit* en *Workers R2 Storage: Edit*. Het script legt dit stap voor stap uit.
 
 Aan het einde toont het script het adres van de app en een **opstartwachtwoord** voor de eerste login. Daarna in de app:
 1. **Eerste keer instellen** → naam + opstartwachtwoord → passkey aanmaken.
@@ -79,7 +87,7 @@ Het script is veilig opnieuw te draaien: wat al bestaat wordt overgeslagen. Je k
 ## Handmatige installatie (als je liever elke stap zelf doet, ±30 minuten)
 
 ### 1. Repository op GitHub
-1. Maak een nieuwe repository, bijv. `wijnkelder`, en upload de inhoud van deze map.
+1. Maak een nieuwe **openbare** repository, bijv. `wijnkelder`, en upload de inhoud van deze map. (GitHub Pages is op een gratis account alleen beschikbaar voor openbare repositories. Dat is veilig: de code bevat geen geheimen — die staan als secrets in Cloudflare — en de app zelf is afgeschermd met passkeys. Wil je de code toch privé houden, dan is GitHub Pro nodig.)
 2. Ga naar **Settings → Pages** en kies bij *Source*: **GitHub Actions**.
 3. Na de eerste push draait de workflow *Webapp naar GitHub Pages*. Het adres wordt `https://<gebruikersnaam>.github.io/wijnkelder/`.
 
@@ -138,6 +146,20 @@ Voeg in de repository onder **Settings → Secrets and variables → Actions** t
 - Cloudflare Workers/D1/R2: gratis tier is ruim voldoende voor een huishouden.
 - AI: een etiketherkenning kost met Claude Haiku of GPT-4o mini doorgaans minder dan een cent, met Claude Sonnet enkele centen en met Opus een dubbeltje of meer; prijsindicaties en spijs-wijn advies zijn goedkoper. AI-verzoeken zijn begrensd op 60 per uur per persoon.
 - Brave Search API: gratis tier (2.000 zoekopdrachten/maand) — alleen nodig als je prijsindicaties op echte webresultaten wilt baseren.
+
+## Bijwerken van een bestaande installatie
+Nieuwe versies vervangen alleen code; jullie wijnen, gebruikers en foto's blijven staan. Wanneer een update een **databasemigratie** meebrengt (staat in `api/migrations/`), voer die dan één keer uit — migraties voegen alleen toe en verwijderen niets:
+```bash
+cd api
+npx wrangler d1 execute wijnkelder --remote --file=./migrations/0002_herkomst.sql -y
+npm run deploy
+```
+
+## Tests
+```bash
+cd api && npm test
+```
+Draait 18 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
 
 ## Lokaal ontwikkelen
 ```bash

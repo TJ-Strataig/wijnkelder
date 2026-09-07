@@ -175,20 +175,45 @@ async function hmacKey(secret) {
   return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 }
 
+// Alleen sleutels van dit exacte formaat worden ondertekend, opgeslagen of geserveerd.
+export const PHOTO_KEY_RE = /^labels\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|heic)$/;
+
+export function isValidPhotoKey(key) {
+  return typeof key === 'string' && PHOTO_KEY_RE.test(key);
+}
+
+// Bericht met ondubbelzinnige scheiding (newline komt nooit in sleutel of exp voor), exp als geheel getal.
+function photoMessage(key, exp) {
+  return new TextEncoder().encode(`${exp}\n${key}`);
+}
+
 export async function signPhotoUrl(env, key, ttlSeconds = 3600) {
+  if (!isValidPhotoKey(key)) return null;
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
   const k = await hmacKey(env.SESSION_SECRET);
-  const sig = await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(`${key}.${exp}`));
+  const sig = await crypto.subtle.sign('HMAC', k, photoMessage(key, exp));
   return `/api/photos/${encodeURIComponent(key)}?exp=${exp}&sig=${b64url(new Uint8Array(sig))}`;
 }
 
 export async function verifyPhotoSig(env, key, exp, sig) {
-  if (!exp || !sig || Number(exp) < Math.floor(Date.now() / 1000)) return false;
+  if (!isValidPhotoKey(key)) return false;
+  if (typeof exp !== 'string' || !/^\d{1,12}$/.test(exp) || typeof sig !== 'string' || !/^[A-Za-z0-9_-]{40,50}$/.test(sig)) return false;
+  if (Number(exp) < Math.floor(Date.now() / 1000)) return false;
   const k = await hmacKey(env.SESSION_SECRET);
   try {
-    return await crypto.subtle.verify('HMAC', k, b64urlDecode(sig), new TextEncoder().encode(`${key}.${exp}`));
+    return await crypto.subtle.verify('HMAC', k, b64urlDecode(sig), photoMessage(key, exp));
   } catch {
     return false;
+  }
+}
+
+// Alleen https-adressen mogen als link worden opgeslagen/getoond.
+export function safeHttpsUrl(u) {
+  try {
+    const url = new URL(String(u));
+    return url.protocol === 'https:' && url.href.length <= 500 ? url.href : null;
+  } catch {
+    return null;
   }
 }
 

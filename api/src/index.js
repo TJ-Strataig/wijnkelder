@@ -4,6 +4,7 @@ import { HttpError, json, corsHeaders, SECURITY_HEADERS } from './util.js';
 import * as auth from './auth.js';
 import * as wines from './wines.js';
 import * as ai from './ai.js';
+import * as origin from './origin.js';
 
 const routes = [];
 function route(method, pattern, handler, { auth: needsAuth = true, admin = false } = {}) {
@@ -57,6 +58,14 @@ route('POST',   '/api/ai/price', ai.priceEstimate);
 route('POST',   '/api/ai/pair', ai.pairFromCellar);
 route('POST',   '/api/ai/dishes', ai.dishesForWine);
 route('GET',    '/api/ai/settings', ai.getAiSettings);
+
+route('GET',    '/api/map', origin.mapData);
+route('POST',   '/api/map/geocode', origin.geocode);
+route('PUT',    '/api/wines/:id/location', origin.setWineLocation);
+route('GET',    '/api/producers', origin.listProducers);
+route('GET',    '/api/producers/by-name', origin.getProducer);
+route('POST',   '/api/producers/profile', origin.buildProducerProfile);
+route('PATCH',  '/api/producers/:id', origin.updateProducer);
 
 // --- alleen beheerder ---
 route('GET',    '/api/admin/users', auth.listUsers, { admin: true });

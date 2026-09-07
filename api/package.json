@@ -6,6 +6,7 @@
   "description": "Backend (Cloudflare Worker) voor de Wijnkelder-app: passkey-login, wijncollectie, foto-herkenning en prijsindicatie.",
   "scripts": {
     "dev": "wrangler dev",
+    "test": "node --no-warnings --test test/*.test.mjs",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create wijnkelder",
     "db:init": "wrangler d1 execute wijnkelder --remote --file=./schema.sql",

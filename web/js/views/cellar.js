@@ -82,11 +82,26 @@ export async function render(main) {
   const wines = await loadWines();
   const inCellar = wines.filter((w) => w.bottles_in_cellar > 0);
   const totalBottles = inCellar.reduce((s, w) => s + w.bottles_in_cellar, 0);
+  const totalPaid = inCellar.reduce((s, w) => s + (w.cellar_value || 0), 0);
+  const totalEstimated = inCellar.reduce((s, w) => s + (w.estimated_value || 0), 0);
+  const withoutValue = inCellar.reduce((s, w) => s + (w.bottles_without_value || 0), 0);
 
   const head = el('div', { class: 'row between' },
     el('div', {}, el('h1', { text: 'Onze kelder' }), el('div', { class: 'muted small', text: `${totalBottles} flessen · ${inCellar.length} verschillende wijnen` })),
     el('a', { class: 'btn gold', href: '#/toevoegen', text: '＋ Wijn toevoegen' }));
   main.append(head);
+
+  // Waarde van de collectie: betaald én geschat (incl. prijsindicatie voor gekregen flessen)
+  if (totalBottles > 0) {
+    main.append(el('div', { class: 'kpis', style: { marginBottom: '1rem' } },
+      el('div', { class: 'kpi' }, el('div', { class: 'v', text: money(totalPaid) }), el('div', { class: 'l', text: 'aankoopwaarde (betaald)' })),
+      el('div', { class: 'kpi', title: 'Betaalde prijs waar bekend; anders de prijsindicatie van de wijn' },
+        el('div', { class: 'v', text: money(totalEstimated) }),
+        el('div', { class: 'l', text: withoutValue ? `indicatie totale waarde · ${withoutValue} fles${withoutValue === 1 ? '' : 'sen'} zonder prijs` : 'indicatie totale waarde' })),
+      totalEstimated > totalPaid && totalPaid > 0
+        ? el('div', { class: 'kpi' }, el('div', { class: 'v', text: `+${money(totalEstimated - totalPaid)}` }), el('div', { class: 'l', text: 'waarde gekregen flessen / waardestijging' }))
+        : null));
+  }
 
   // Zoekbalk en filterknop
   const search = el('input', { type: 'search', placeholder: 'Zoek op naam, producent, druif, streek, gerecht…', value: f.q, 'aria-label': 'Zoeken' });
@@ -148,7 +163,8 @@ export async function render(main) {
     clear(grid);
     const bottles = list.reduce((s, w) => s + w.bottles_in_cellar, 0);
     const value = list.reduce((s, w) => s + (w.cellar_value || 0), 0);
-    summary.textContent = `${list.length} wijnen · ${bottles} flessen${value ? ` · aankoopwaarde ${money(value)}` : ''}`;
+    const est = list.reduce((s, w) => s + (w.estimated_value || 0), 0);
+    summary.textContent = `${list.length} wijnen · ${bottles} flessen${value ? ` · betaald ${money(value)}` : ''}${est ? ` · indicatie ${money(est)}` : ''}`;
     if (!list.length) {
       grid.append(el('div', { class: 'empty', style: { gridColumn: '1 / -1' } }, el('div', { class: 'big', text: '🍇' }), el('p', { text: wines.length ? 'Geen wijnen gevonden met deze filters.' : 'De kelder is nog leeg. Voeg je eerste wijn toe!' })));
       return;

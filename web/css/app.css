@@ -243,3 +243,92 @@ code { background: var(--paper); padding: 0.1rem 0.35rem; border-radius: 6px; fo
 .tabs button.active { color: var(--bordeaux-light); border-bottom-color: var(--gold); font-weight: 600; }
 [data-theme="dark"] .tabs button.active { color: var(--gold); }
 @media print { .topbar, .bottomnav, .btn, .toolbar, .filters { display: none !important; } }
+
+/* ===== Mobiel (iPhone) ===================================================== */
+/* iOS zoomt automatisch in op invoervelden met een lettergrootte < 16px; daarom altijd minimaal 16px. */
+input, select, textarea { font-size: max(16px, 1rem); }
+/* Minimale aanraakgrootte 44pt (Apple HIG) voor alle knoppen en chips. */
+.btn, .chip, .icon-btn, .tabs button, .bottomnav a { min-height: 44px; }
+.btn.sm { min-height: 40px; }
+.check { min-height: 44px; }
+input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
+input[type="range"] { height: 44px; }
+/* Geen "plakkende" hover-kleuren op touchscreens */
+@media (hover: none) {
+  .btn:hover { background: var(--bordeaux); }
+  .wine-card:hover { transform: none; }
+  .sidenav a:hover, .icon-btn:hover { background: transparent; }
+}
+/* Veilige zones links/rechts (liggend, Dynamic Island) */
+.main { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
+.topbar { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
+/* Onderbalk: ruimte onder de content zodat de laatste kaart niet achter de balk valt */
+@media (max-width: 899px) {
+  .main { padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
+  h1 { font-size: 1.45rem; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7rem; }
+  .wine-card h3 { font-size: 0.95rem; }
+  .wine-card .body { padding: 0.6rem 0.7rem 0.75rem; }
+  .label-img { max-height: 46dvh; aspect-ratio: auto; object-fit: contain; background: var(--paper); }
+  .detail-hero { gap: 0.8rem; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .kpi { padding: 0.65rem 0.8rem; }
+  .kpi .v { font-size: 1.35rem; }
+  .form-grid { grid-template-columns: 1fr; }
+  .toolbar { gap: 0.5rem; }
+  .toolbar select { flex: 1; min-width: 0; }
+  .table { font-size: 0.85rem; }
+  .table th, .table td { padding: 0.45rem 0.35rem; }
+  .table td .row { flex-wrap: nowrap; }
+  .bar { grid-template-columns: 90px 1fr 36px; }
+  .modal { padding: 1rem; max-height: 88dvh; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+  .modal-actions { position: sticky; bottom: 0; background: var(--card); padding-top: 0.6rem; margin-top: 0.6rem; border-top: 1px solid var(--line); }
+  .modal-actions .btn { flex: 1; justify-content: center; }
+  .toasts { bottom: calc(64px + env(safe-area-inset-bottom)); padding: 0 1rem; }
+  .toast { text-align: center; }
+  .history-item { grid-template-columns: 44px 1fr auto; }
+  .suggestion { grid-template-columns: 48px 1fr; }
+  .user-chip { display: none; }
+  .chips { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 0.3rem; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { white-space: nowrap; flex-shrink: 0; }
+}
+/* Heel smalle schermen: één kolom */
+@media (max-width: 360px) { .grid { grid-template-columns: 1fr; } }
+/* Als geïnstalleerde app (standalone): geen dubbele statusbalk-ruimte */
+@media (display-mode: standalone) {
+  .topbar { padding-top: max(0.6rem, env(safe-area-inset-top)); }
+}
+/* Tekst in kaarten netjes afbreken */
+.wine-card h3, .wine-card .producer, .kv dd, .note, .history-item { overflow-wrap: anywhere; }
+/* Scrollen in modals en tabellen soepel op iOS */
+.modal, .table-wrap { -webkit-overflow-scrolling: touch; }
+/* Selecties lichter op mobiel */
+select { background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%; background-size: 5px 5px; background-repeat: no-repeat; -webkit-appearance: none; appearance: none; padding-right: 2rem; }
+
+/* ===== Herkomstkaart ======================================================= */
+.minimap { position: relative; overflow: hidden; background: #dfe9d9; border-radius: var(--radius); border: 1px solid var(--line); height: 62dvh; min-height: 320px; user-select: none; -webkit-user-select: none; cursor: grab; }
+.minimap:active { cursor: grabbing; }
+.mm-tiles, .mm-markers { position: absolute; inset: 0; }
+.mm-tile { position: absolute; left: 0; top: 0; width: 256px; height: 256px; opacity: 0; transition: opacity 0.2s; pointer-events: none; image-rendering: auto; }
+.mm-tile.loaded { opacity: 1; }
+[data-theme="dark"] .mm-tile { filter: brightness(0.85) saturate(0.9); }
+.mm-marker { position: absolute; transform: translate(-50%, -100%); background: none; border: 0; padding: 0; cursor: pointer; min-height: 0; width: 34px; height: 44px; }
+.mm-pin { display: block; width: 28px; height: 28px; margin: 0 auto; background: var(--c, var(--bordeaux)); border: 2px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+.mm-count { position: absolute; left: 50%; top: 5px; transform: translateX(-50%); color: #fff; font-weight: 700; font-size: 0.72rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5); pointer-events: none; }
+.mm-marker.cluster .mm-pin { width: 34px; height: 34px; border-radius: 50%; transform: none; background: var(--gold); border-color: var(--bordeaux-deep); }
+.mm-marker.cluster .mm-count { color: var(--bordeaux-deep); text-shadow: none; top: 8px; font-size: 0.85rem; }
+.mm-marker.cluster { width: 40px; height: 40px; transform: translate(-50%, -50%); }
+.mm-controls { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 5; }
+.mm-btn { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 1.3rem; font-weight: 700; cursor: pointer; box-shadow: var(--shadow); }
+.mm-attribution { position: absolute; right: 0; bottom: 0; font-size: 0.62rem; background: rgba(255,255,255,0.8); color: #333; padding: 2px 6px; border-radius: 6px 0 0 0; pointer-events: none; }
+.mm-popup { position: absolute; transform: translate(-50%, -100%); background: var(--card); color: var(--ink); border-radius: 12px; box-shadow: var(--shadow); border: 1px solid var(--line); padding: 0.7rem 0.8rem; width: min(300px, 82vw); z-index: 6; font-size: 0.9rem; cursor: default; }
+.mm-popup::after { content: ''; position: absolute; left: 50%; bottom: -8px; width: 14px; height: 14px; background: var(--card); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: translateX(-50%) rotate(45deg); }
+.mm-close { position: absolute; right: 4px; top: 2px; background: none; border: 0; font-size: 1.3rem; color: var(--muted); cursor: pointer; min-height: 0; width: 32px; height: 32px; }
+.mm-popup h3 { font-size: 1rem; margin: 0 1.4rem 0.3rem 0; }
+.mm-popup ul { margin: 0.3rem 0 0; padding-left: 1rem; max-height: 160px; overflow: auto; }
+.mm-popup li { margin: 0.15rem 0; }
+.legend { display: flex; gap: 0.6rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); align-items: center; }
+.legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; border: 1px solid rgba(0,0,0,0.2); }
+.producer-card { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: start; }
+@media (max-width: 899px) { .minimap { height: 56dvh; } }

@@ -1,6 +1,6 @@
 // AI-functies: etiket herkennen vanaf een foto, prijsindicatie en spijs-wijn advies uit de eigen kelder.
 // Werkt met Anthropic (Claude) én met elke OpenAI-compatibele API; de beheerder kiest aanbieder, sleutel en model in de app.
-import { HttpError, json, readJson, str, oneOf, rateLimit, WINE_TYPES, logActivity, nowIso, getSetting, setSetting, encryptSecret, decryptSecret } from './util.js';
+import { HttpError, json, readJson, str, oneOf, rateLimit, WINE_TYPES, logActivity, nowIso, getSetting, setSetting, encryptSecret, decryptSecret, safeHttpsUrl } from './util.js';
 
 const WINE_SCHEMA_HINT = `{
   "name": "naam van de wijn zoals op het etiket (zonder producent als die apart staat)",
@@ -143,6 +143,8 @@ function extractJson(text) {
   if (start >= 0 && end > start) { try { return JSON.parse(cleaned.slice(start, end + 1)); } catch { /* onleesbaar */ } }
   throw new HttpError(502, 'De AI gaf een onleesbaar antwoord.');
 }
+
+export async function chatJson(env, messages, opts) { return chat(env, messages, opts); }
 
 async function chat(env, messages, { maxTokens = 1500, temperature = 0.2 } = {}) {
   const cfg = await aiConfig(env);
@@ -329,7 +331,9 @@ export async function priceEstimate(req, env, { user }) {
       });
       if (res.ok) {
         const data = await res.json();
-        sources = (data.web?.results || []).slice(0, 8).map((r) => ({ title: r.title, url: r.url, snippet: (r.description || '').slice(0, 300) }));
+        sources = (data.web?.results || []).slice(0, 8)
+          .map((r) => ({ title: str(r.title, { max: 200 }), url: safeHttpsUrl(r.url), snippet: String(r.description || '').slice(0, 300) }))
+          .filter((r) => r.url);
       }
     } catch (e) {
       console.error('Zoekfout', e);
@@ -351,7 +355,7 @@ export async function priceEstimate(req, env, { user }) {
   const price = safeNum(result.price_eur, 0, 1e6);
   const min = safeNum(result.min_eur, 0, 1e6);
   const max = safeNum(result.max_eur, 0, 1e6);
-  const source = { at: nowIso(), confidence: safeNum(result.confidence, 0, 1), reasoning: str(result.reasoning, { max: 1000 }), sources: sources.filter((s) => (result.sources_used || []).includes(s.url)).slice(0, 5), method: sources.length ? 'web+ai' : 'ai' };
+  const source = { at: nowIso(), confidence: safeNum(result.confidence, 0, 1), reasoning: str(result.reasoning, { max: 1000 }), sources: sources.filter((s) => (Array.isArray(result.sources_used) ? result.sources_used : []).includes(s.url)).map((s) => ({ title: s.title, url: s.url })).slice(0, 5), method: sources.length ? 'web+ai' : 'ai' };
   await env.DB.prepare('UPDATE wines SET estimated_price = ?, estimated_price_min = ?, estimated_price_max = ?, estimated_price_source = ?, estimated_price_at = ?, updated_at = ? WHERE id = ?')
     .bind(price, min, max, JSON.stringify(source), nowIso(), nowIso(), w.id).run();
   await logActivity(env, user.id, 'ai.price', 'wine', w.id, { name: w.name, price });

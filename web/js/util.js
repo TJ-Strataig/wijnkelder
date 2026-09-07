@@ -7,6 +7,7 @@ export function el(tag, attrs = {}, ...children) {
     if (k === 'class') node.className = v;
     else if (k === 'text') node.textContent = v;
     else if (k === 'html') throw new Error('innerHTML is niet toegestaan');
+    else if ((k === 'href' || k === 'src') && /^\s*(javascript|vbscript|data):/i.test(String(v)) && !/^\s*data:image\//i.test(String(v))) continue; // nooit script-URL's
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
     else if (k === 'dataset') Object.assign(node.dataset, v);
     else if (k === 'style' && typeof v === 'object') for (const [prop, val] of Object.entries(v)) { if (prop.startsWith('--')) node.style.setProperty(prop, val); else node.style[prop] = val; }

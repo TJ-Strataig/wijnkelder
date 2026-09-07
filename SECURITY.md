@@ -50,6 +50,21 @@ Dit document beschrijft hoe de app is beveiligd en welke keuzes daarbij zijn gem
 - Zet geheimen **nooit** in `wrangler.toml` of in de code; gebruik `wrangler secret put`. Voor lokaal testen: `.dev.vars` (staat in `.gitignore`).
 - `SESSION_SECRET` moet minimaal 32 willekeurige tekens zijn, bijv. `openssl rand -base64 48`.
 
+## Beveiligingsreview (september 2026)
+De volledige code (API, webapp, installatiescripts, workflows) is onderworpen aan een onafhankelijke beveiligingsreview plus een geautomatiseerde testset (`cd api && npm test`, 18 tests). Er zijn geen kritieke of hoge bevindingen gevonden. De volgende punten (1× medium, 4× laag) zijn gevonden en verholpen:
+
+| # | Ernst | Bevinding | Oplossing |
+|---|---|---|---|
+| 1 | Medium | Een ingelogd lid kon via een zelfgekozen `label_image_key` de server een foto-link laten ondertekenen die nooit verliep (dubbelzinnige HMAC-boodschap + `exp` niet als geheel getal gecontroleerd). | Fotosleutels moeten exact het serverformaat hebben én bestaan in de opslag; HMAC-boodschap heeft nu een ondubbelzinnige structuur; `exp` en `sig` worden strikt op formaat gecontroleerd. |
+| 2 | Laag | Links in de prijsbron-informatie werden ongefilterd als `href` getoond (alleen de CSP hield `javascript:` tegen). | Server slaat alleen `https:`-links op in een vaste structuur; de webapp toont alleen `https:`-links; `el()` weigert script-URL's in `href`/`src`. |
+| 3 | Laag | CSV-export was gevoelig voor formule-injectie in Excel/LibreOffice. | Cellen die met `= + - @ tab CR` beginnen krijgen een `'`-prefix. |
+| 4 | Laag | Deploy-workflow haalde zonder lockfile telkens nieuwe pakketversies binnen en had geen expliciete rechtenbeperking. | `npm ci` met vastgelegde `package-lock.json`; `permissions: contents: read`. |
+| 5 | Laag | CSP stond `connect-src`/`img-src` naar elke https-host toe. | Beperkt tot `*.workers.dev` (jullie API) en `frame-ancestors 'none'` toegevoegd. |
+
+Gecontroleerd en in orde bevonden: routering en autorisatie (admin/lid), volledige WebAuthn-flow (eenmalige challenges, atomische uitnodigingen, bootstrap-lockout, origin/RP-ID-controle), sessiebeheer, geparametriseerde SQL, foto-upload en -serving, XSS-oppervlak (geen `innerHTML`), CORS/CSRF, AES-GCM-versleuteling met unieke IV, geheimen (nooit gelogd of teruggegeven), AI-uitvoer als onbetrouwbare invoer, service worker, exports en rate limiting.
+
+**Restrisico dat je zelf kunt verkleinen:** het sessietoken staat in `localStorage` op `<naam>.github.io`. Die oorsprong deel je met al je andere GitHub Pages-projecten onder hetzelfde account. Publiceer daarom geen andere (onbetrouwbare) sites onder dit GitHub-account, of gebruik een eigen domein voor de wijnkelder.
+
 ## Wat de app bewust NIET doet
 - Geen wachtwoorden, geen e-mail-links, geen "wachtwoord vergeten".
 - Geen openbare registratie.

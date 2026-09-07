@@ -3,6 +3,7 @@ import { el, clear, field, input, select, checkbox, modal, confirmDialog, toast,
 import { api, photoUrl } from '../api.js';
 import { invalidateWines } from '../data.js';
 import { dishesForWine } from '../pairings.js';
+import { producerPanel } from './producers.js';
 
 const year = new Date().getFullYear();
 
@@ -95,6 +96,15 @@ export async function render(main, { params, navigate }) {
       root.append(c);
     }
 
+    // Wijnhuis & herkomst
+    if (w.producer) {
+      const pc = producerPanel(w.producer, { compact: true });
+      root.append(pc);
+    }
+    if (w.latitude !== null && w.latitude !== undefined) {
+      root.append(el('p', { class: 'small' }, el('a', { href: '#/herkomst', text: '🗺️ Bekijk de herkomst op de kaart' }), el('span', { class: 'muted', text: w.geo_label ? ` · ${w.geo_label}` : '' })));
+    }
+
     // Prijsindicatie (vooral voor gekregen flessen)
     const priceCard = el('div', { class: 'card' });
     priceCard.append(el('h2', { style: { marginTop: 0 }, text: 'Prijsindicatie' }));
@@ -104,7 +114,8 @@ export async function render(main, { params, navigate }) {
       if (src) {
         priceCard.append(el('p', { class: 'small muted', text: `${src.method === 'web+ai' ? 'Op basis van webresultaten en AI' : 'AI-schatting'}${src.confidence !== null && src.confidence !== undefined ? ` · zekerheid ${Math.round(src.confidence * 100)}%` : ''} · ${fmtDate(w.estimated_price_at)}` }));
         if (src.reasoning) priceCard.append(el('p', { class: 'small', text: src.reasoning }));
-        if (src.sources?.length) priceCard.append(el('ul', { class: 'small' }, src.sources.map((s) => el('li', {}, el('a', { href: s.url, target: '_blank', rel: 'noopener noreferrer', text: s.title || s.url })))));
+        const links = (src.sources || []).filter((s) => { try { return new URL(s.url).protocol === 'https:'; } catch { return false; } });
+        if (links.length) priceCard.append(el('ul', { class: 'small' }, links.map((s) => el('li', {}, el('a', { href: s.url, target: '_blank', rel: 'noopener noreferrer', text: s.title || s.url })))));
       }
     } else {
       priceCard.append(el('p', { class: 'muted small', text: inCellar.some((b) => b.gifted) ? 'Deze wijn is (deels) gekregen. Haal een prijsindicatie op om de waarde van de kelder compleet te maken.' : 'Nog geen prijsindicatie opgehaald.' }));

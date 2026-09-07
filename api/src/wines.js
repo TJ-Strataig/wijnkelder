@@ -1,8 +1,33 @@
 // Wijnen, flessen, proefnotities, historie, verlanglijst, statistieken, export en foto's.
 import {
   HttpError, json, noContent, readJson, uuid, nowIso, str, num, bool, strArray, oneOf, isoDate,
-  WINE_TYPES, BOTTLE_REMOVE_REASONS, signPhotoUrl, verifyPhotoSig, logActivity, SECURITY_HEADERS,
+  WINE_TYPES, BOTTLE_REMOVE_REASONS, signPhotoUrl, verifyPhotoSig, isValidPhotoKey, safeHttpsUrl, logActivity, SECURITY_HEADERS,
 } from './util.js';
+
+// Fotosleutel uit invoer: alleen exact formaat, en de foto moet echt bestaan in de opslag.
+async function photoKeyFromBody(env, v) {
+  if (v === undefined) return undefined;
+  if (v === null || v === '') return null;
+  if (!isValidPhotoKey(v)) throw new HttpError(400, 'Ongeldige fotoverwijzing.');
+  if (!(await env.FOTOS.get(v))) throw new HttpError(400, 'Foto niet gevonden. Upload de foto opnieuw.');
+  return v;
+}
+
+// Prijsbron-informatie wordt opnieuw opgebouwd uit een vaste set velden; links alleen https.
+function sanitizePriceSource(src) {
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
+  const out = {
+    at: str(src.at, { max: 40 }),
+    confidence: num(src.confidence, { min: 0, max: 1 }),
+    reasoning: str(src.reasoning, { max: 1000 }),
+    method: oneOf(src.method, ['web+ai', 'ai', 'manual'], { name: 'method' }) || 'manual',
+    sources: (Array.isArray(src.sources) ? src.sources : []).slice(0, 5).map((x) => ({
+      title: str(x?.title, { max: 200 }),
+      url: safeHttpsUrl(x?.url),
+    })).filter((x) => x.url),
+  };
+  return out;
+}
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
@@ -23,6 +48,15 @@ async function decorateWine(env, w) {
     favorite: !!w.favorite,
     label_image_url: w.label_image_key ? await signPhotoUrl(env, w.label_image_key) : null,
   };
+}
+
+// Smaakprofiel: alleen bekende velden met korte tekstlijsten.
+function sanitizeTastingProfile(tp) {
+  if (!tp || typeof tp !== 'object' || Array.isArray(tp)) return null;
+  const out = {};
+  for (const k of ['aromas', 'flavors']) if (tp[k]) out[k] = strArray(tp[k], { maxItems: 20, maxLen: 60 });
+  if (tp.finish) out.finish = str(tp.finish, { max: 200 });
+  return Object.keys(out).length ? JSON.stringify(out) : null;
 }
 
 // Vertaalt de invoer naar databasevelden; wordt gebruikt bij aanmaken en bewerken.
@@ -53,13 +87,13 @@ function wineFields(body) {
     decant_minutes: num(body.decant_minutes, { min: 0, max: 600, int: true, name: 'Decanteren' }),
     food_pairings: JSON.stringify(strArray(body.food_pairings, { maxItems: 40, maxLen: 80 })),
     description: str(body.description, { max: 4000 }),
-    tasting_profile: body.tasting_profile ? JSON.stringify(body.tasting_profile).slice(0, 4000) : null,
+    tasting_profile: sanitizeTastingProfile(body.tasting_profile),
     notes: str(body.notes, { max: 4000 }),
     favorite: bool(body.favorite),
     estimated_price: num(body.estimated_price, { min: 0, max: 1e6, name: 'Prijsindicatie' }),
     estimated_price_min: num(body.estimated_price_min, { min: 0, max: 1e6 }),
     estimated_price_max: num(body.estimated_price_max, { min: 0, max: 1e6 }),
-    estimated_price_source: body.estimated_price_source ? JSON.stringify(body.estimated_price_source).slice(0, 4000) : null,
+    estimated_price_source: body.estimated_price_source ? JSON.stringify(sanitizePriceSource(body.estimated_price_source)) : null,
   };
 }
 
@@ -83,6 +117,8 @@ const WINE_LIST_SQL = `
     (SELECT AVG(rating) FROM tasting_notes t WHERE t.wine_id = w.id AND t.rating IS NOT NULL) AS avg_rating,
     (SELECT COUNT(*) FROM tasting_notes t WHERE t.wine_id = w.id) AS tasting_count,
     (SELECT SUM(COALESCE(price, 0)) FROM bottles b WHERE b.wine_id = w.id AND b.status = 'in_cellar') AS cellar_value,
+    (SELECT SUM(COALESCE(b.price, w.estimated_price, 0)) FROM bottles b WHERE b.wine_id = w.id AND b.status = 'in_cellar') AS estimated_value,
+    (SELECT COUNT(*) FROM bottles b WHERE b.wine_id = w.id AND b.status = 'in_cellar' AND b.price IS NULL AND w.estimated_price IS NULL) AS bottles_without_value,
     (SELECT GROUP_CONCAT(DISTINCT location) FROM bottles b WHERE b.wine_id = w.id AND b.status = 'in_cellar' AND location IS NOT NULL) AS locations,
     (SELECT MAX(gifted) FROM bottles b WHERE b.wine_id = w.id) AS any_gifted
   FROM wines w`;
@@ -118,9 +154,10 @@ export async function createWine(req, env, { user }) {
   const f = wineFields(body);
   const id = uuid();
   const cols = Object.keys(f);
+  const labelKey = (await photoKeyFromBody(env, body.label_image_key)) ?? null;
   await env.DB.prepare(
     `INSERT INTO wines (id, ${cols.join(', ')}, label_image_key, created_by) VALUES (?, ${cols.map(() => '?').join(', ')}, ?, ?)`
-  ).bind(id, ...cols.map((c) => f[c]), str(body.label_image_key, { max: 200 }), user.id).run();
+  ).bind(id, ...cols.map((c) => f[c]), labelKey, user.id).run();
 
   // Flessen direct meenemen (aantal + aankoopgegevens).
   const qty = Math.min(Math.max(num(body.quantity, { min: 0, max: 500, int: true }) ?? 1, 0), 500);
@@ -143,7 +180,7 @@ export async function updateWine(req, env, { user, params }) {
   const f = wineFields(body);
   const cols = Object.keys(f);
   const sets = cols.map((c) => `${c} = ?`).join(', ');
-  const labelKey = body.label_image_key === undefined ? undefined : str(body.label_image_key, { max: 200 });
+  const labelKey = await photoKeyFromBody(env, body.label_image_key);
   await env.DB.prepare(
     `UPDATE wines SET ${sets}${labelKey === undefined ? '' : ', label_image_key = ?'}, updated_at = ? WHERE id = ?`
   ).bind(...cols.map((c) => f[c]), ...(labelKey === undefined ? [] : [labelKey]), nowIso(), params.id).run();
@@ -362,6 +399,7 @@ export async function exportAll(req, env) {
     bottles: await q('SELECT * FROM bottles'),
     tasting_notes: await q('SELECT * FROM tasting_notes'),
     wishlist: await q('SELECT * FROM wishlist'),
+    producers: await q('SELECT * FROM producers'),
     users: await q('SELECT id, name, role FROM users'),
   };
   return json(data);
@@ -376,8 +414,9 @@ export async function exportCsv(req, env) {
   const cols = rows.length ? Object.keys(rows[0]) : [];
   const esc = (v) => {
     if (v === null || v === undefined) return '';
-    const s = String(v);
-    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    let s = String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; // voorkomt formule-uitvoering in Excel/LibreOffice
+    return /[",\n;']/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const csv = [cols.join(';'), ...rows.map((r) => cols.map((c) => esc(c === 'grapes' ? parseJsonField(r[c], []).join(', ') : r[c])).join(';'))].join('\r\n');
   return new Response('\uFEFF' + csv, {
