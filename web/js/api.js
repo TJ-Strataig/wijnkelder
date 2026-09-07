@@ -18,7 +18,7 @@ export const session = {
 };
 
 export class ApiError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, data) { super(message); this.status = status; this.data = data || null; }
 }
 
 export function photoUrl(path) {
@@ -51,7 +51,7 @@ async function request(method, path, body, { raw = false, contentType } = {}) {
     return res;
   }
   const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, data.error || `Fout ${res.status}`);
+  if (!res.ok) throw new ApiError(res.status, data.error || `Fout ${res.status}`, data);
   return data;
 }
 

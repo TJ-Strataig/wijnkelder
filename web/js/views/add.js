@@ -2,7 +2,7 @@
 import { el, clear, field, input, select, checkbox, toast, TYPE_LABELS, shrinkImage, wineTitle } from '../util.js';
 import { api, photoUrl } from '../api.js';
 import { loadWines, invalidateWines } from '../data.js';
-import { bottleForm, destinationForm } from './wine.js';
+import { bottleForm, destinationForm, duplicateDialog } from './wine.js';
 
 export async function render(main, { params, mode, navigate }) {
   const editing = mode === 'edit';
@@ -170,7 +170,16 @@ export async function render(main, { params, mode, navigate }) {
       } else {
         const b = bottles.values();
         const consumed = destination.values();
-        result = await api.post('/api/wines', { ...payload, quantity: b.quantity, bottle: b, consumed: consumed || undefined });
+        const create = (extra = {}) => api.post('/api/wines', { ...payload, quantity: b.quantity, bottle: b, consumed: consumed || undefined, ...extra });
+        try {
+          result = await create();
+        } catch (e) {
+          if (e.status !== 409 || !e.data?.duplicate) throw e;
+          const choice = await duplicateDialog(e.data.duplicate, { quantity: b.quantity });
+          if (!choice) { saveBtn.disabled = false; return; }
+          result = await create(choice === 'merge' ? { merge_into: e.data.duplicate.id } : { allow_duplicate: true });
+          if (choice === 'merge') { invalidateWines(); toast(`${b.quantity} fles${b.quantity === 1 ? '' : 'sen'} bijgeboekt op de bestaande wijn`, 'ok'); navigate(`/wijn/${result.wine.id}`); return; }
+        }
       }
       invalidateWines();
       toast(editing ? 'Wijn bijgewerkt' : (destination?.isHistory() ? 'Wijn toegevoegd aan de historie 🥂' : 'Wijn toegevoegd aan de kelder 🍷'), 'ok');
@@ -195,17 +204,22 @@ export async function render(main, { params, mode, navigate }) {
     if (!draft.type) draft.type = 'rood';
   }
   async function checkDuplicate() {
-    if (editing) return;
+    if (editing || !draft.name) return;
     try {
-      const all = await loadWines();
-      const same = all.find((w) => w.name.toLowerCase() === (draft.name || '').toLowerCase() && (w.producer || '').toLowerCase() === (draft.producer || '').toLowerCase() && (w.vintage || null) === (draft.vintage || null));
-      if (same) {
-        clear(dupNotice);
-        dupNotice.append('Deze wijn staat al in de kelder — ', el('a', { href: `#/wijn/${same.id}`, text: 'voeg daar flessen toe' }), ' in plaats van een dubbele.');
+      const r = await api.post('/api/wines/check-duplicate', { name: draft.name, producer: draft.producer, vintage: draft.vintage, type: draft.type, grapes: draft.grapes, volume_ml: draft.volume_ml });
+      clear(dupNotice);
+      if (r.exact) {
+        dupNotice.className = 'badge warn';
+        dupNotice.append('⚠ Deze wijn staat al in de collectie (', el('a', { href: `#/wijn/${r.exact.id}`, text: `${r.exact.bottles_in_cellar} in de kelder` }), '). Bij opslaan krijg je de keuze om de flessen bij te boeken.');
+        dupNotice.hidden = false;
+      } else if (r.near.length) {
+        dupNotice.className = 'badge';
+        const n = r.near[0];
+        dupNotice.append('Vergelijkbare wijn aanwezig: ', el('a', { href: `#/wijn/${n.id}`, text: [n.producer, n.name, n.vintage].filter(Boolean).join(' ') }), n.differences.length ? ` — verschil: ${n.differences.join(', ')}` : '');
         dupNotice.hidden = false;
       } else dupNotice.hidden = true;
     } catch { /* stil */ }
   }
-  F.name.addEventListener('blur', () => { readForm(); checkDuplicate(); });
+  for (const k of ['name', 'producer', 'vintage', 'type']) F[k].addEventListener('change', () => { readForm(); checkDuplicate(); });
   fillForm();
 }

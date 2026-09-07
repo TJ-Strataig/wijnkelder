@@ -86,9 +86,9 @@ export async function approveIntake(req, env, { user, params }) {
     const fakeReq = new Request(req.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...bottle, quantity, consumed }) });
     result = await addBottles(fakeReq, env, { user, params: { id: existingId } });
   } else {
-    const payload = { ...wine, label_image_key: row.label_image_key || null, quantity, bottle, consumed };
+    const payload = { ...wine, label_image_key: row.label_image_key || null, quantity, bottle, consumed, allow_duplicate: body.allow_duplicate === true };
     const fakeReq = new Request(req.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    result = await createWine(fakeReq, env, { user });
+    result = await createWine(fakeReq, env, { user }); // gooit HttpError 409 met duplicate-info als de wijn al bestaat
   }
   const data = await result.json();
   await env.DB.prepare("UPDATE intake_queue SET status = 'approved', wine = ?, bottle = ?, approved_wine_id = ?, updated_at = ? WHERE id = ?")

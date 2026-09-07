@@ -15,7 +15,8 @@ alle leden zien en beheren dezelfde collectie.
 - **Meerdere flessen** per wijn, elk met eigen prijs, aankoopdatum, winkel, inhoud (halve fles t/m dubbele magnum) en **locatie in de kelder** (rek/plank).
 - Per fles vastleggen of het een **gekregen fles** is (en van wie). Voor gekregen flessen haalt de app met één klik een **prijsindicatie** op (webzoekresultaten + AI, met bronvermelding en zekerheid).
 - **Bewaarwijn**-markering, drinkvenster (drinken van–tot), **hoogtepunt** (op z'n best van–tot), hoe de wijn zich ontwikkelt, serveertemperatuur en decanteertijd — met een visuele tijdlijn en statussen als *Nu op z'n best*, *Te jong*, *Snel drinken*, *Over hoogtepunt*.
-- Favorieten, eigen notities, dubbele-wijn-detectie bij het toevoegen.
+- **Duplicaatbewaking**: voer je een fles in die al in de collectie staat (zelfde wijnhuis, naam, jaargang, type, druiven en inhoud — hoofdletters en accenten tellen niet), dan waarschuwt de app direct tijdens het invullen én blokkeert de server een dubbel record. Je kiest dan: *flessen bijboeken* op de bestaande wijn (meestal), of *toch apart toevoegen* als het echt een andere wijn is. Werkt overal: Toevoegen, bulk en de beoordelingswachtrij. Een andere jaargang of een magnum telt als andere wijn; daarvoor krijg je een zachte hint.
+- Favorieten, eigen notities.
 
 **Zoeken & filteren** op naam, producent, land, streek, type (rood / wit / rosé / mousserend / port / dessert / versterkt / oranje), jaargang (van–tot), druivenras, bewaarwijn, drinkvenster-status, gekregen, favoriet, locatie, prijs — en sorteren op naam, jaargang, beoordeling, aantal, "drinken vóór" of prijs.
 
@@ -162,7 +163,7 @@ npm run deploy
 ```bash
 cd api && npm test
 ```
-Draait 23 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
+Draait 25 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
 
 ## Lokaal ontwikkelen
 ```bash

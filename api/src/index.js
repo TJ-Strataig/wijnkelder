@@ -32,6 +32,7 @@ route('DELETE', '/api/auth/passkeys/:id', auth.deleteMyPasskey);
 
 route('GET',    '/api/wines', wines.listWines);
 route('POST',   '/api/wines', wines.createWine);
+route('POST',   '/api/wines/check-duplicate', wines.checkDuplicate);
 route('GET',    '/api/wines/:id', wines.getWine);
 route('PUT',    '/api/wines/:id', wines.updateWine);
 route('DELETE', '/api/wines/:id', wines.deleteWine);
@@ -124,7 +125,7 @@ export default {
       const status = e instanceof HttpError ? e.status : 500;
       if (status >= 500) console.error(e);
       const message = e instanceof HttpError ? e.message : 'Er ging iets mis op de server.';
-      return json({ error: message }, status, cors);
+      return json({ error: message, ...(e instanceof HttpError && e.extra ? e.extra : {}) }, status, cors);
     }
   },
 

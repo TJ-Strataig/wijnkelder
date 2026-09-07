@@ -31,8 +31,8 @@ test('direct naar historie: restaurantfles, met plaats/datum/proefnotitie; niet 
   assert.equal(add.json.wine.bottles_in_cellar, 3, 'kelder blijft 3');
   assert.equal(add.json.bottles.filter((x) => x.status === 'consumed').length, 1);
   // 4. Ongeldige reden geweigerd, ongeldige datum geweigerd
-  assert.equal((await call(worker, env, '/api/wines', { method: 'POST', token: u.token, body: { name: 'X', type: 'rood', consumed: { reason: 'hacked' } } })).status, 400);
-  assert.equal((await call(worker, env, '/api/wines', { method: 'POST', token: u.token, body: { name: 'X', type: 'rood', consumed: { date: 'gisteren' } } })).status, 400);
+  assert.equal((await call(worker, env, '/api/wines', { method: 'POST', token: u.token, body: { name: 'Validatie1', type: 'rood', consumed: { reason: 'hacked' } } })).status, 400);
+  assert.equal((await call(worker, env, '/api/wines', { method: 'POST', token: u.token, body: { name: 'Validatie2', type: 'rood', consumed: { date: 'gisteren' } } })).status, 400);
   // 5. Via de beoordelingswachtrij
   const q = await call(worker, env, '/api/intake', { method: 'POST', token: u.token, body: { label_image_key: null, wine: { name: 'Champagne', type: 'mousserend' } } });
   const ap = await call(worker, env, `/api/intake/${q.json.id}/approve`, { method: 'POST', token: u.token, body: { bottle: { quantity: 1, price: 60 }, consumed: { reason: 'consumed', place: 'Thuis', date: '2026-09-07' } } });

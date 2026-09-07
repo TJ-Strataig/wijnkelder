@@ -269,6 +269,27 @@ function editBottleDialog(w, b, reload) {
   });
 }
 
+// Melding bij een dubbele wijn. Geeft terug: 'merge' (flessen bijboeken), 'separate' (bewust apart) of null (annuleren).
+export function duplicateDialog(dup, { allowSeparate = true, quantity = 1 } = {}) {
+  return new Promise((resolve) => {
+    let choice = null;
+    modal({
+      title: 'Deze wijn staat al in de collectie',
+      body: el('div', {},
+        el('p', {}, 'Je voert een fles in die al bekend is: ', el('strong', { text: [dup.producer, dup.name, dup.vintage].filter(Boolean).join(' ') }),
+          el('span', { class: 'muted', text: ` (${typeLabel(dup.type)}${dup.grapes?.length ? ', ' + dup.grapes.join('/') : ''}${dup.volume_ml && dup.volume_ml !== 750 ? ', ' + dup.volume_ml + ' ml' : ''})` })),
+        el('p', { class: 'small' }, `Nu ${dup.bottles_in_cellar} in de kelder, ${dup.bottles_total} in totaal. `, el('a', { href: `#/wijn/${dup.id}`, target: '_blank', text: 'Bekijk de bestaande wijn' })),
+        el('p', { class: 'small muted', text: `Waarschijnlijk is dit dezelfde fles. Kies "Flessen bijboeken" om ${quantity} fles${quantity === 1 ? '' : 'sen'} toe te voegen aan het bestaande record — zo blijft de collectie overzichtelijk. Alleen als het echt een andere wijn is (bijv. een andere cuvée met dezelfde naam) kies je "Toch apart toevoegen".` })),
+      onClose: () => resolve(choice),
+      actions: [
+        { label: 'Annuleren', class: 'ghost' },
+        allowSeparate ? { label: 'Toch apart toevoegen', class: 'ghost', onClick: () => { choice = 'separate'; } } : null,
+        { label: `Flessen bijboeken (${quantity})`, class: 'gold', onClick: () => { choice = 'merge'; } },
+      ].filter(Boolean),
+    });
+  });
+}
+
 // Bestemming van nieuwe flessen: in de kelder, of direct naar de historie (restaurant, meteen gedronken, weggegeven).
 export function destinationForm({ compact = false } = {}) {
   const dest = select([['cellar', '🍷 In de kelder leggen'], ['consumed', '🥂 Al gedronken → direct naar de historie'], ['gifted_away', '🎁 Meteen weggegeven → historie']], { value: 'cellar' });

@@ -149,9 +149,63 @@ export async function getWine(req, env, { params }) {
   return json({ wine: await decorateWine(env, w), bottles: bottles.map((b) => ({ ...b, gifted: !!b.gifted })), tastings: tastings.map((t) => ({ ...t, would_buy_again: t.would_buy_again === null ? null : !!t.would_buy_again })) });
 }
 
+// Normaliseert een tekst voor vergelijking: kleine letters, geen accenten, geen leestekens, geen dubbele spaties.
+function normKey(v) {
+  return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+// Twee wijnen zijn "dezelfde fles" als wijnhuis, naam, jaargang, type, druiven en inhoud overeenkomen.
+function sameWine(a, b) {
+  const grapesA = [...new Set((Array.isArray(a.grapes) ? a.grapes : parseJsonField(a.grapes, [])).map(normKey))].sort().join('|');
+  const grapesB = [...new Set((Array.isArray(b.grapes) ? b.grapes : parseJsonField(b.grapes, [])).map(normKey))].sort().join('|');
+  return normKey(a.name) === normKey(b.name)
+    && normKey(a.producer) === normKey(b.producer)
+    && (a.vintage || null) === (b.vintage || null)
+    && (a.type || 'rood') === (b.type || 'rood')
+    && (grapesA === grapesB || !grapesA || !grapesB) // onbekende druiven blokkeren de match niet
+    && (a.volume_ml || 750) === (b.volume_ml || 750);
+}
+
+// Zoekt een bestaande wijn die dezelfde fles is; geeft ook "bijna-duplicaten" terug (zelfde naam+wijnhuis, ander detail).
+export async function findDuplicateWine(env, candidate) {
+  // Voorselectie op jaargang (indexvriendelijk); de echte vergelijking gebeurt genormaliseerd in code (accenten/hoofdletters).
+  const rows = (await env.DB.prepare(
+    `SELECT w.id, w.name, w.producer, w.vintage, w.type, w.grapes, w.volume_ml, w.region, w.country,
+            (SELECT COUNT(*) FROM bottles b WHERE b.wine_id = w.id AND b.status = 'in_cellar') AS bottles_in_cellar,
+            (SELECT COUNT(*) FROM bottles b WHERE b.wine_id = w.id) AS bottles_total
+     FROM wines w WHERE w.producer IS NOT NULL OR w.name IS NOT NULL LIMIT 5000`
+  ).all()).results.filter((r) => normKey(r.name) === normKey(candidate.name) || normKey(r.producer) === normKey(candidate.producer));
+  const exact = rows.find((r) => sameWine(r, candidate)) || null;
+  const near = exact ? [] : rows.filter((r) => normKey(r.name) === normKey(candidate.name) && normKey(r.producer) === normKey(candidate.producer)).map((r) => ({
+    ...r, grapes: parseJsonField(r.grapes, []),
+    differences: [
+      (r.vintage || null) !== (candidate.vintage || null) ? `jaargang ${r.vintage || 'n.v.'} i.p.v. ${candidate.vintage || 'n.v.'}` : null,
+      (r.type || 'rood') !== (candidate.type || 'rood') ? `type ${r.type} i.p.v. ${candidate.type}` : null,
+      (r.volume_ml || 750) !== (candidate.volume_ml || 750) ? `inhoud ${r.volume_ml || 750} ml i.p.v. ${candidate.volume_ml || 750} ml` : null,
+    ].filter(Boolean),
+  }));
+  return { exact: exact ? { ...exact, grapes: parseJsonField(exact.grapes, []) } : null, near };
+}
+
+// POST /api/wines/check-duplicate — vooraf controleren (voor de melding in de app).
+export async function checkDuplicate(req, env) {
+  const body = await readJson(req, 20_000);
+  if (!body.name) return json({ exact: null, near: [] });
+  return json(await findDuplicateWine(env, { name: body.name, producer: body.producer, vintage: num(body.vintage, { min: 1800, max: 2100, int: true }), type: body.type, grapes: strArray(body.grapes), volume_ml: num(body.volume_ml, { min: 50, max: 30000, int: true }) }));
+}
+
 export async function createWine(req, env, { user }) {
   const body = await readJson(req, 200_000);
   const f = wineFields(body);
+  // Dubbele wijn? Dan geen tweede record, tenzij de app expliciet zegt dat het bewust is (allow_duplicate) of wil bijboeken (merge_into).
+  const dup = await findDuplicateWine(env, { ...f, grapes: parseJsonField(f.grapes, []) });
+  if (dup.exact && body.merge_into === dup.exact.id) {
+    const merged = new Request(req.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...(body.bottle || {}), quantity: body.quantity ?? 1, consumed: body.consumed }) });
+    return addBottles(merged, env, { user, params: { id: dup.exact.id } });
+  }
+  if (dup.exact && !body.allow_duplicate) {
+    throw new HttpError(409, `Deze wijn staat al in de collectie: ${[dup.exact.producer, dup.exact.name, dup.exact.vintage].filter(Boolean).join(' ')} (${dup.exact.bottles_in_cellar} in de kelder). Voeg de flessen daar toe in plaats van een dubbel record.`, { duplicate: dup.exact });
+  }
   const id = uuid();
   const cols = Object.keys(f);
   const labelKey = (await photoKeyFromBody(env, body.label_image_key)) ?? null;
