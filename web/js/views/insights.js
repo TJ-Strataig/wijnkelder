@@ -38,7 +38,7 @@ async function tasteView(body) {
     if (!p.tastings) { grid.append(el('div', { class: 'card' }, el('h2', { style: { marginTop: 0 }, text: p.user.name }), el('p', { class: 'muted small', text: 'Nog geen scores.' }))); continue; }
     grid.append(el('div', { class: 'card' },
       el('h2', { style: { marginTop: 0 }, text: p.user.name }),
-      el('div', { class: 'kpis', style: { gridTemplateColumns: 'repeat(3, 1fr)' } }, kpi(p.tastings, 'proefnotities'), kpi(p.avg, 'gem. score'), kpi(p.buyAgainRate !== null ? `${p.buyAgainRate}%` : '—', 'opnieuw kopen')),
+      el('div', { class: 'kpis', style: { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } }, kpi(p.tastings, 'proefnotities'), kpi(p.avg, 'gem. score'), kpi(p.buyAgainRate !== null ? `${p.buyAgainRate}%` : '—', 'opnieuw kopen')),
       el('h3', { text: 'Per type' }), scoreBars(p.byType),
       el('h3', { text: 'Favoriete druiven' }), scoreBars(p.byGrape.slice(0, 6)),
       el('h3', { text: 'Per streek' }), scoreBars(p.byRegion.slice(0, 6)),
@@ -61,7 +61,7 @@ async function valueView(body) {
   // Eenvoudige scatter: prijs (log) vs score
   const c = el('div', { class: 'card' }, el('h2', { style: { marginTop: 0 }, text: 'Prijs tegenover score' }));
   const W = 600, H = 280, pad = 36;
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.style.width = '100%'; svg.style.height = 'auto';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('preserveAspectRatio', 'xMidYMid meet'); svg.style.width = '100%'; svg.style.maxWidth = '100%'; svg.style.height = 'auto'; svg.style.display = 'block';
   const lp = d.points.map((p) => Math.log(p.price)); const minX = Math.min(...lp), maxX = Math.max(...lp) + 0.01; const minY = Math.min(50, ...d.points.map((p) => p.avg_rating)) - 2, maxY = 100;
   const sx = (x) => pad + ((Math.log(x) - minX) / (maxX - minX)) * (W - pad * 2), sy = (y) => H - pad - ((y - minY) / (maxY - minY)) * (H - pad * 2);
   const mk = (t, a) => { const n = document.createElementNS('http://www.w3.org/2000/svg', t); for (const [k, v] of Object.entries(a)) n.setAttribute(k, v); return n; };
