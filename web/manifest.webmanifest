@@ -1,0 +1,17 @@
+{
+  "name": "Wijnkelder van Angela & Tije",
+  "short_name": "Wijnkelder",
+  "description": "Onze gezamenlijke wijncollectie: voorraad, proefnotities, drinkvensters en spijs-wijn advies.",
+  "start_url": "./#/kelder",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f1e8",
+  "theme_color": "#5a1a2e",
+  "lang": "nl",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

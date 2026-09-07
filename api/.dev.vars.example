@@ -1,0 +1,5 @@
+# Kopieer naar .dev.vars voor lokaal testen met `npm run dev` (nooit committen!)
+SESSION_SECRET=vervang-door-een-lange-willekeurige-string-van-minimaal-32-tekens
+BOOTSTRAP_SECRET=kies-een-eenmalig-opstartwachtwoord
+# AI_API_KEY=sk-ant-...   (optioneel; normaal stel je de sleutel in de app in)
+# BRAVE_API_KEY=BSA...

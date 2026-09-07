@@ -1,0 +1,21 @@
+{
+  "name": "wijnkelder-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Backend (Cloudflare Worker) voor de Wijnkelder-app: passkey-login, wijncollectie, foto-herkenning en prijsindicatie.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create wijnkelder",
+    "db:init": "wrangler d1 execute wijnkelder --remote --file=./schema.sql",
+    "db:init:local": "wrangler d1 execute wijnkelder --local --file=./schema.sql",
+    "r2:create": "wrangler r2 bucket create wijnkelder-fotos"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "^13.1.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4.20.0"
+  }
+}

@@ -1,0 +1,28 @@
+# Publiceert de API (Cloudflare Worker) bij elke push naar main.
+# Vereist twee repository-secrets: CLOUDFLARE_API_TOKEN en CLOUDFLARE_ACCOUNT_ID.
+name: API naar Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+    paths: ['api/**', '.github/workflows/deploy-api.yml']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci || npm install
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: api
+          command: deploy
