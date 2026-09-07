@@ -159,18 +159,47 @@ export async function createWine(req, env, { user }) {
     `INSERT INTO wines (id, ${cols.join(', ')}, label_image_key, created_by) VALUES (?, ${cols.map(() => '?').join(', ')}, ?, ?)`
   ).bind(id, ...cols.map((c) => f[c]), labelKey, user.id).run();
 
-  // Flessen direct meenemen (aantal + aankoopgegevens).
+  // Flessen direct meenemen (aantal + aankoopgegevens), in de kelder of — met "consumed" — direct in de historie.
   const qty = Math.min(Math.max(num(body.quantity, { min: 0, max: 500, int: true }) ?? 1, 0), 500);
   const bf = bottleFields(body.bottle || body);
+  const consumed = consumedFields(body.consumed);
+  const bottleIds = await insertBottles(env, user, id, qty, bf, consumed);
+  if (consumed && body.consumed.tasting && bottleIds.length) await insertTasting(env, user, id, bottleIds[0], { ...body.consumed.tasting, tasted_at: body.consumed.tasting.tasted_at || consumed.date, paired_with: body.consumed.tasting.paired_with, occasion: body.consumed.tasting.occasion || consumed.occasion });
+  await logActivity(env, user.id, consumed ? 'wine.created_consumed' : 'wine.created', 'wine', id, { name: f.name, quantity: qty, place: consumed?.place });
+  return getWine(req, env, { params: { id } });
+}
+
+// Gegevens voor flessen die direct naar de historie gaan (bijv. gedronken in een restaurant of meteen na aankoop).
+// { reason, date, place, occasion, note, tasting? }
+function consumedFields(c) {
+  if (!c || typeof c !== 'object') return null;
+  const reason = oneOf(c.reason, BOTTLE_REMOVE_REASONS, { name: 'Reden' }) || 'consumed';
+  const date = isoDate(c.date, { name: 'Datum' }) || nowIso().slice(0, 10);
+  const place = str(c.place, { max: 150 });
+  const occasion = str(c.occasion, { max: 200 });
+  const note = str(c.note, { max: 1000 });
+  const parts = [place ? `Gedronken bij ${place}` : null, occasion, note].filter(Boolean);
+  return { reason, date, place, occasion, note: parts.join(' · ') || null };
+}
+
+async function insertBottles(env, user, wineId, qty, bf, consumed) {
+  const ids = [];
   const stmts = [];
   for (let i = 0; i < qty; i++) {
-    stmts.push(env.DB.prepare(
-      'INSERT INTO bottles (id, wine_id, size_ml, price, currency, gifted, gifted_from, purchase_date, purchase_place, location, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(uuid(), id, bf.size_ml, bf.price, bf.currency, bf.gifted, bf.gifted_from, bf.purchase_date, bf.purchase_place, bf.location, user.id));
+    const bid = uuid(); ids.push(bid);
+    if (consumed) {
+      stmts.push(env.DB.prepare(
+        `INSERT INTO bottles (id, wine_id, status, size_ml, price, currency, gifted, gifted_from, purchase_date, purchase_place, location, added_by, removed_by, removed_at, removed_reason, removed_note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`
+      ).bind(bid, wineId, consumed.reason, bf.size_ml, bf.price, bf.currency, bf.gifted, bf.gifted_from, bf.purchase_date || consumed.date, bf.purchase_place || consumed.place, user.id, user.id, consumed.date, consumed.reason, consumed.note));
+    } else {
+      stmts.push(env.DB.prepare(
+        'INSERT INTO bottles (id, wine_id, size_ml, price, currency, gifted, gifted_from, purchase_date, purchase_place, location, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(bid, wineId, bf.size_ml, bf.price, bf.currency, bf.gifted, bf.gifted_from, bf.purchase_date, bf.purchase_place, bf.location, user.id));
+    }
   }
   if (stmts.length) await env.DB.batch(stmts);
-  await logActivity(env, user.id, 'wine.created', 'wine', id, { name: f.name, quantity: qty });
-  return getWine(req, env, { params: { id } });
+  return ids;
 }
 
 export async function updateWine(req, env, { user, params }) {
@@ -213,18 +242,14 @@ export async function toggleFavorite(req, env, { user, params }) {
 export async function addBottles(req, env, { user, params }) {
   const w = await env.DB.prepare('SELECT id, name FROM wines WHERE id = ?').bind(params.id).first();
   if (!w) throw new HttpError(404, 'Wijn niet gevonden.');
-  const body = await readJson(req, 20_000);
+  const body = await readJson(req, 50_000);
   const qty = num(body.quantity, { min: 1, max: 500, int: true, name: 'Aantal' }) ?? 1;
   const bf = bottleFields(body);
-  const stmts = [];
-  for (let i = 0; i < qty; i++) {
-    stmts.push(env.DB.prepare(
-      'INSERT INTO bottles (id, wine_id, size_ml, price, currency, gifted, gifted_from, purchase_date, purchase_place, location, added_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(uuid(), w.id, bf.size_ml, bf.price, bf.currency, bf.gifted, bf.gifted_from, bf.purchase_date, bf.purchase_place, bf.location, user.id));
-  }
-  stmts.push(env.DB.prepare('UPDATE wines SET updated_at = ? WHERE id = ?').bind(nowIso(), w.id));
-  await env.DB.batch(stmts);
-  await logActivity(env, user.id, 'bottles.added', 'wine', w.id, { name: w.name, quantity: qty, gifted: !!bf.gifted });
+  const consumed = consumedFields(body.consumed);
+  const ids = await insertBottles(env, user, w.id, qty, bf, consumed);
+  if (consumed && body.consumed.tasting && ids.length) await insertTasting(env, user, w.id, ids[0], { ...body.consumed.tasting, tasted_at: body.consumed.tasting.tasted_at || consumed.date, occasion: body.consumed.tasting.occasion || consumed.occasion });
+  await env.DB.prepare('UPDATE wines SET updated_at = ? WHERE id = ?').bind(nowIso(), w.id).run();
+  await logActivity(env, user.id, consumed ? 'bottles.added_consumed' : 'bottles.added', 'wine', w.id, { name: w.name, quantity: qty, gifted: !!bf.gifted, place: consumed?.place });
   return getWine(req, env, { params });
 }
 

@@ -79,13 +79,14 @@ export async function approveIntake(req, env, { user, params }) {
   const quantity = num(bottle.quantity, { min: 1, max: 500, int: true, name: 'Aantal' }) ?? 1;
 
   let result;
+  const consumed = body.consumed && typeof body.consumed === 'object' ? body.consumed : undefined;
   const existingId = str(body.existing_wine_id, { max: 60 });
   if (existingId) {
     // Flessen bijboeken op een bestaande wijn (duplicaat)
-    const fakeReq = new Request(req.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...bottle, quantity }) });
+    const fakeReq = new Request(req.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...bottle, quantity, consumed }) });
     result = await addBottles(fakeReq, env, { user, params: { id: existingId } });
   } else {
-    const payload = { ...wine, label_image_key: row.label_image_key || null, quantity, bottle };
+    const payload = { ...wine, label_image_key: row.label_image_key || null, quantity, bottle, consumed };
     const fakeReq = new Request(req.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     result = await createWine(fakeReq, env, { user });
   }

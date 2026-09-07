@@ -2,7 +2,7 @@
 import { el, clear, field, input, select, checkbox, toast, TYPE_LABELS, shrinkImage, wineTitle } from '../util.js';
 import { api, photoUrl } from '../api.js';
 import { loadWines, invalidateWines } from '../data.js';
-import { bottleForm } from './wine.js';
+import { bottleForm, destinationForm } from './wine.js';
 
 export async function render(main, { params, mode, navigate }) {
   const editing = mode === 'edit';
@@ -132,12 +132,14 @@ export async function render(main, { params, mode, navigate }) {
   wrap.append(formCard);
 
   // ---- Stap 3: flessen (alleen bij nieuw) -------------------------------------
-  let bottles = null;
+  let bottles = null, destination = null;
   if (!editing) {
     const bCard = el('div', { class: 'card' });
     bCard.append(el('h2', { style: { marginTop: 0 }, text: '3. Flessen' }));
+    destination = destinationForm();
     bottles = bottleForm({});
-    bCard.append(bottles.node, el('p', { class: 'muted small', text: 'Bij een gekregen fles kun je na het opslaan met één klik een prijsindicatie ophalen.' }));
+    bCard.append(destination.node, el('hr', { style: { border: 0, borderTop: '1px solid var(--line)', margin: '0.8rem 0' } }), bottles.node,
+      el('p', { class: 'muted small', text: 'Bij een gekregen fles kun je na het opslaan met één klik een prijsindicatie ophalen. Een fles die al gedronken is (bijv. in een restaurant) komt direct in de historie en telt niet mee in de kelder.' }));
     wrap.append(bCard);
   }
 
@@ -149,7 +151,7 @@ export async function render(main, { params, mode, navigate }) {
   } catch { /* niet kritisch */ }
 
   // ---- Opslaan ----------------------------------------------------------------
-  const saveBtn = el('button', { class: 'btn gold', type: 'button', text: editing ? 'Wijzigingen opslaan' : 'Toevoegen aan de kelder' });
+  const saveBtn = el('button', { class: 'btn gold', type: 'button', text: editing ? 'Wijzigingen opslaan' : 'Toevoegen' });
   wrap.append(el('div', { class: 'row', style: { justifyContent: 'flex-end' } }, el('a', { class: 'btn ghost', href: editing ? `#/wijn/${existing.id}` : '#/kelder', text: 'Annuleren' }), saveBtn));
   saveBtn.addEventListener('click', async () => {
     readForm();
@@ -167,10 +169,11 @@ export async function render(main, { params, mode, navigate }) {
         result = await api.put(`/api/wines/${existing.id}`, payload);
       } else {
         const b = bottles.values();
-        result = await api.post('/api/wines', { ...payload, quantity: b.quantity, bottle: b });
+        const consumed = destination.values();
+        result = await api.post('/api/wines', { ...payload, quantity: b.quantity, bottle: b, consumed: consumed || undefined });
       }
       invalidateWines();
-      toast(editing ? 'Wijn bijgewerkt' : 'Wijn toegevoegd aan de kelder 🍷', 'ok');
+      toast(editing ? 'Wijn bijgewerkt' : (destination?.isHistory() ? 'Wijn toegevoegd aan de historie 🥂' : 'Wijn toegevoegd aan de kelder 🍷'), 'ok');
       navigate(`/wijn/${result.wine.id}`);
     } catch (e) { toast(e.message, 'error'); saveBtn.disabled = false; }
   });

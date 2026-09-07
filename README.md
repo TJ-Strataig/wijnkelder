@@ -11,6 +11,7 @@ alle leden zien en beheren dezelfde collectie.
 - **Bulk toevoegen**: kies meerdere etiketfoto's tegelijk (van één of verschillende wijnhuizen) of fotografeer fles na fles. Gedeelde aankoopgegevens (datum, winkel, kelderlocatie) vul je één keer in; **aantal en prijs per fles** apart. De AI herkent de etiketten; jij controleert en keurt **elke fles apart goed** voordat hij in de kelder komt. Duplicaten worden herkend en als extra flessen bijgeboekt.
 - **Later beoordelen**: zet het vinkje aan en de foto's + herkenning gaan naar een **beoordelingswachtrij op de server**. Maak onderweg of in de winkel de foto's op je telefoon, en loop ze later op de desktop rustig door (bewaren, goedkeuren, overslaan). Alle huishoudleden zien dezelfde wachtrij, gegroepeerd per partij.
 - Wijnen toevoegen **via een foto van het etiket** (AI herkent producent, naam, jaargang, land, streek, appellatie, druiven, alcohol, stijl, drinkvenster, ontwikkeling, gerechten, beschrijving en een prijsindicatie) of **handmatig**, met een knop om ontbrekende gegevens door AI te laten aanvullen.
+- **Direct naar de historie**: bij het toevoegen kies je *in de kelder leggen* of *al gedronken / meteen weggegeven*. Handig voor een fles in een restaurant of een cadeau dat meteen opengaat: met datum, waar gedronken, gelegenheid en desgewenst een proefnotitie. Werkt op de Toevoegen-pagina, bij bulk-goedkeuring, in de wachtrij en bij *Flessen toevoegen* op een bestaande wijn.
 - **Meerdere flessen** per wijn, elk met eigen prijs, aankoopdatum, winkel, inhoud (halve fles t/m dubbele magnum) en **locatie in de kelder** (rek/plank).
 - Per fles vastleggen of het een **gekregen fles** is (en van wie). Voor gekregen flessen haalt de app met één klik een **prijsindicatie** op (webzoekresultaten + AI, met bronvermelding en zekerheid).
 - **Bewaarwijn**-markering, drinkvenster (drinken van–tot), **hoogtepunt** (op z'n best van–tot), hoe de wijn zich ontwikkelt, serveertemperatuur en decanteertijd — met een visuele tijdlijn en statussen als *Nu op z'n best*, *Te jong*, *Snel drinken*, *Over hoogtepunt*.
@@ -161,7 +162,7 @@ npm run deploy
 ```bash
 cd api && npm test
 ```
-Draait 22 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
+Draait 23 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
 
 ## Lokaal ontwikkelen
 ```bash

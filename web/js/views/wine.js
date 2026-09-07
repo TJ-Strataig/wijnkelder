@@ -252,10 +252,11 @@ export function bottleForm(defaults = {}) {
 
 function addBottlesDialog(w, reload) {
   const form = bottleForm({ location: (w.locations || '').split(',')[0] || '' });
+  const dest = destinationForm({ compact: true });
   modal({
     title: `Flessen toevoegen — ${w.name}`,
-    body: form.node,
-    actions: [{ label: 'Annuleren', class: 'ghost' }, { label: 'Toevoegen', class: 'gold', onClick: async () => { await api.post(`/api/wines/${w.id}/bottles`, form.values()); toast('Flessen toegevoegd', 'ok'); reload(); } }],
+    body: el('div', {}, dest.node, el('hr', { style: { border: 0, borderTop: '1px solid var(--line)', margin: '0.8rem 0' } }), form.node),
+    actions: [{ label: 'Annuleren', class: 'ghost' }, { label: 'Toevoegen', class: 'gold', onClick: async () => { await api.post(`/api/wines/${w.id}/bottles`, { ...form.values(), consumed: dest.values() || undefined }); toast(dest.isHistory() ? 'Toegevoegd aan de historie' : 'Flessen toegevoegd', 'ok'); reload(); } }],
   });
 }
 
@@ -266,6 +267,37 @@ function editBottleDialog(w, b, reload) {
     body: form.node,
     actions: [{ label: 'Annuleren', class: 'ghost' }, { label: 'Opslaan', onClick: async () => { await api.put(`/api/wines/${w.id}/bottles/${b.id}`, form.values()); toast('Fles bijgewerkt', 'ok'); reload(); } }],
   });
+}
+
+// Bestemming van nieuwe flessen: in de kelder, of direct naar de historie (restaurant, meteen gedronken, weggegeven).
+export function destinationForm({ compact = false } = {}) {
+  const dest = select([['cellar', '🍷 In de kelder leggen'], ['consumed', '🥂 Al gedronken → direct naar de historie'], ['gifted_away', '🎁 Meteen weggegeven → historie']], { value: 'cellar' });
+  const date = el('input', { type: 'date', value: new Date().toISOString().slice(0, 10) });
+  const place = input({ placeholder: 'Bijv. Restaurant De Librije, thuis, bij vrienden', maxlength: 150 });
+  const occasion = input({ placeholder: 'Bijv. verjaardag Angela, diner met ouders', maxlength: 200 });
+  const note = input({ placeholder: 'Opmerking', maxlength: 1000 });
+  const withTasting = checkbox('Proefnotitie toevoegen', { checked: !compact });
+  const tasting = tastingFields();
+  const tastingWrap = el('fieldset', {}, el('legend', { text: 'Proefnotitie' }), tasting.node);
+  const details = el('div', { class: 'form-grid', hidden: true }, field('Wanneer', date), field('Waar gedronken / aan wie gegeven', place), field('Gelegenheid', occasion), el('div', { class: 'full' }, field('Opmerking', note)));
+  const tastingBlock = el('div', { hidden: true }, withTasting.wrap, tastingWrap);
+  const toggle = () => {
+    const hist = dest.value !== 'cellar';
+    details.hidden = !hist;
+    tastingBlock.hidden = !(hist && dest.value === 'consumed');
+    tastingWrap.hidden = !withTasting.input.checked;
+    place.placeholder = dest.value === 'gifted_away' ? 'Aan wie gegeven?' : 'Bijv. Restaurant De Librije, thuis, bij vrienden';
+  };
+  dest.addEventListener('change', toggle); withTasting.input.addEventListener('change', toggle); toggle();
+  const node = el('div', {}, field('Waar gaat deze fles heen?', dest), details, tastingBlock);
+  return {
+    node,
+    isHistory: () => dest.value !== 'cellar',
+    values: () => dest.value === 'cellar' ? null : {
+      reason: dest.value, date: date.value || null, place: place.value.trim() || null, occasion: occasion.value.trim() || null, note: note.value.trim() || null,
+      tasting: dest.value === 'consumed' && withTasting.input.checked ? { ...tasting.values(), tasted_at: tasting.values().tasted_at || date.value, paired_with: tasting.values().paired_with } : undefined,
+    },
+  };
 }
 
 export function tastingFields(defaults = {}) {

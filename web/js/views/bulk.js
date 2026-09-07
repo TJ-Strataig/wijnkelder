@@ -5,6 +5,7 @@
 import { el, clear, field, input, select, checkbox, toast, confirmDialog, TYPE_LABELS, shrinkImage, wineTitle, money, fmtDateTime } from '../util.js';
 import { api, photoUrl } from '../api.js';
 import { loadWines, invalidateWines } from '../data.js';
+import { destinationForm } from './wine.js';
 
 const STATUS_LABEL = { wachten: 'In de wachtrij', herkennen: 'Herkennen…', uploaden: 'Opslaan in wachtrij…', controleren: 'Controleren', fout: 'Herkenning mislukt', goedgekeurd: 'Toegevoegd', overgeslagen: 'Overgeslagen', opgeslagen: 'In wachtrij voor later' };
 const STATUS_CLASS = { wachten: '', herkennen: 'warn', uploaden: 'warn', controleren: 'gold', fout: 'bad', goedgekeurd: 'ok', overgeslagen: '', opgeslagen: 'ok' };
@@ -218,16 +219,17 @@ function uploadView(body, existing, { refreshCount }) {
     const bf = bottleFields({ ...batch.values(), quantity: 1 });
     const wrap = el('div');
     if (it.duplicate) wrap.append(el('div', { class: 'badge warn', style: { marginBottom: '0.5rem' }, text: `Staat al in de kelder (${it.duplicate.bottles_in_cellar}×). Goedkeuren boekt flessen bij op die wijn.` }));
-    wrap.append(wf.node, el('div', { style: { padding: '0.6rem', margin: '0.4rem 0', background: 'var(--paper)', borderRadius: '10px' } }, bf.node));
+    const df = destinationForm({ compact: true });
+    wrap.append(wf.node, el('div', { style: { padding: '0.6rem', margin: '0.4rem 0', background: 'var(--paper)', borderRadius: '10px' } }, bf.node, df.node));
     const approveBtn = el('button', { class: 'btn gold', type: 'button', text: '✓ Goedkeuren en toevoegen' });
     approveBtn.addEventListener('click', async () => {
       const w = wf.values(); if (!w.name) return toast('Vul een naam in', 'error');
       approveBtn.disabled = true; approveBtn.textContent = 'Toevoegen…';
-      it.wine = w; it.bottle = bf.values();
+      it.wine = w; it.bottle = bf.values(); const consumed = df.values() || undefined;
       try {
         let labelKey = null; if (it.blob) { try { labelKey = (await api.upload(it.blob)).key; } catch { /* foto optioneel */ } }
         const dup = findDuplicate(existing, w);
-        const r = dup ? await api.post(`/api/wines/${dup.id}/bottles`, it.bottle) : await api.post('/api/wines', { ...w, label_image_key: labelKey, quantity: it.bottle.quantity, bottle: it.bottle });
+        const r = dup ? await api.post(`/api/wines/${dup.id}/bottles`, { ...it.bottle, consumed }) : await api.post('/api/wines', { ...w, label_image_key: labelKey, quantity: it.bottle.quantity, bottle: it.bottle, consumed });
         it.savedId = r.wine.id; it.status = 'goedgekeurd';
         if (!dup) existing.push({ id: r.wine.id, name: w.name, producer: w.producer, vintage: w.vintage, bottles_in_cellar: it.bottle.quantity });
         invalidateWines(); toast(`${wineTitle(w)} toegevoegd`, 'ok');
@@ -315,14 +317,15 @@ async function queueView(body, existing, { refreshCount }) {
     const wrap = el('div');
     const dup = it.wine ? findDuplicate(existing, it.wine) : null;
     if (dup) wrap.append(el('div', { class: 'badge warn', style: { marginBottom: '0.5rem' }, text: `Staat al in de kelder (${dup.bottles_in_cellar}×). Goedkeuren boekt flessen bij op die wijn.` }));
-    wrap.append(wf.node, el('div', { style: { padding: '0.6rem', margin: '0.4rem 0', background: 'var(--paper)', borderRadius: '10px' } }, bf.node));
+    const df = destinationForm({ compact: true });
+    wrap.append(wf.node, el('div', { style: { padding: '0.6rem', margin: '0.4rem 0', background: 'var(--paper)', borderRadius: '10px' } }, bf.node, df.node));
     const approveBtn = el('button', { class: 'btn gold', type: 'button', text: '✓ Goedkeuren en toevoegen' });
     approveBtn.addEventListener('click', async () => {
       const w = wf.values(); if (!w.name) return toast('Vul een naam in', 'error');
       approveBtn.disabled = true; approveBtn.textContent = 'Toevoegen…';
       try {
         const d = findDuplicate(existing, w);
-        const r = await api.post(`/api/intake/${it.id}/approve`, { wine: w, bottle: bf.values(), existing_wine_id: d ? d.id : null });
+        const r = await api.post(`/api/intake/${it.id}/approve`, { wine: w, bottle: bf.values(), consumed: df.values() || undefined, existing_wine_id: d ? d.id : null });
         if (!d) existing.push({ id: r.wine_id, name: w.name, producer: w.producer, vintage: w.vintage, bottles_in_cellar: bf.values().quantity });
         invalidateWines(); toast(`${wineTitle(w)} toegevoegd`, 'ok'); load(); refreshCount();
       } catch (e) { toast(e.message, 'error'); approveBtn.disabled = false; approveBtn.textContent = '✓ Goedkeuren en toevoegen'; }
