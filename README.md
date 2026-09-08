@@ -36,6 +36,8 @@ alle leden zien en beheren dezelfde collectie.
 - Locaties worden automatisch bepaald (knop *Locaties bepalen*): eerst het wijnhuis zelf, anders appellatie, streek of land — de nauwkeurigheid staat erbij.
 - **Wijnhuizen** (in het menu): alle producenten uit de kelder, met een door de AI geschreven profiel (geschiedenis, ligging, eigenaar, wijnmaker, hectares, filosofie, bekendste wijnen, website) en ruimte voor eigen notities. Ook zichtbaar op de wijnpagina en op de kaart.
 
+**De Sommelier (chat-agent)** — tabblad 🍷 in de onderbalk. Praat in gewone taal, stuur een foto of spreek je vraag in. De Sommelier heeft gereedschappen en handelt zelf: kelder doorzoeken, etiket herkennen (→ beoordelingswachtrij, pas in de kelder na jouw bevestiging), wijnkaart lezen, fles afboeken met proefnotitie, drie flessen voor vanavond kiezen, verlanglijst, drinkvensters. Onder elk antwoord staat wat hij deed. **Hij praat uitsluitend over wijn**: drie lagen bewaking (onderwerpcontrole vóór elk antwoord, strikte instructie, gereedschappen die alleen wijngegevens kunnen) weren andere onderwerpen, andere dranken en pogingen om zijn instructies te omzeilen; geweigerde vragen staan in het activiteitenlog.
+
 **Slimme functies**
 - **Vanavond** — één tik en de huissommelier kiest drie flessen uit de kelder: een veilige keuze, een verrassing en iets dat nu open moet. Rekening houdend met dag, seizoen, wat je recent dronk, jullie scores en drinkvensters.
 - **Restaurant-modus** — fotografeer de wijnkaart; de sommelier markeert wat jullie kennen (met eigen score) en adviseert op basis van smaakprofiel, gerecht en budget.
@@ -169,7 +171,7 @@ Voeg in de repository onder **Settings → Secrets and variables → Actions** t
 Nieuwe versies vervangen alleen code; jullie wijnen, gebruikers en foto's blijven staan. Wanneer een update een **databasemigratie** meebrengt (staat in `api/migrations/`), voer die dan één keer uit — migraties voegen alleen toe en verwijderen niets:
 ```bash
 cd api
-npx wrangler d1 execute wijnkelder --remote --file=./migrations/0004_slim.sql -y
+npx wrangler d1 execute wijnkelder --remote --file=./migrations/0005_sommelier_chat.sql -y
 npm run deploy
 ```
 
@@ -189,7 +191,7 @@ Daarna in de app: *Instellingen → Meldingen → Pushmeldingen inschakelen* (op
 ```bash
 cd api && npm test
 ```
-Draait 27 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
+Draait 31 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
 
 ## Lokaal ontwikkelen
 ```bash

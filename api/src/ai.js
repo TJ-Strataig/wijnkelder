@@ -145,6 +145,47 @@ function extractJson(text) {
 }
 
 export async function chatJson(env, messages, opts) { return chat(env, messages, opts); }
+export async function getAiConfig(env) { return aiConfig(env); }
+
+// ---- Tool-calling (agent) voor Anthropic en OpenAI ---------------------------------------------
+// tools: [{ name, description, input_schema }]  messages: interne vorm (role user/assistant/tool)
+// Antwoord: { text, toolCalls: [{ id, name, input }], stop }
+export async function chatWithTools(env, { system, messages, tools, maxTokens = 1200, temperature = 0.4 }) {
+  const cfg = await aiConfig(env);
+  const base = cfg.baseUrl.replace(/\/$/, '');
+  if (cfg.provider === 'anthropic') {
+    const msgs = messages.map((m) => {
+      if (m.role === 'tool') return { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.tool_call_id, content: String(m.content).slice(0, 20000) }] };
+      if (m.role === 'assistant' && m.tool_calls?.length) return { role: 'assistant', content: [...(m.content ? [{ type: 'text', text: m.content }] : []), ...m.tool_calls.map((t) => ({ type: 'tool_use', id: t.id, name: t.name, input: t.input }))] };
+      if (typeof m.content === 'string') return { role: m.role, content: m.content };
+      return { role: m.role, content: m.content.map((part) => part.type === 'image_url' ? (() => { const mm = part.image_url.url.match(/^data:(image\/[a-z]+);base64,(.+)$/); return { type: 'image', source: { type: 'base64', media_type: mm[1], data: mm[2] } }; })() : { type: 'text', text: part.text }) };
+    });
+    // Anthropic vereist dat opeenvolgende berichten van dezelfde rol samengevoegd zijn
+    const merged = [];
+    for (const m of msgs) { const last = merged[merged.length - 1]; if (last && last.role === m.role) { last.content = [...(typeof last.content === 'string' ? [{ type: 'text', text: last.content }] : last.content), ...(typeof m.content === 'string' ? [{ type: 'text', text: m.content }] : m.content)]; } else merged.push({ ...m }); }
+    const res = await fetch(`${base}/v1/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: cfg.model, max_tokens: maxTokens, temperature, system, messages: merged, tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema })) }) });
+    if (!res.ok) throw await providerError(res);
+    const data = await res.json();
+    const text = (data.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n').trim();
+    const toolCalls = (data.content || []).filter((c) => c.type === 'tool_use').map((c) => ({ id: c.id, name: c.name, input: c.input || {} }));
+    return { text, toolCalls, stop: data.stop_reason };
+  }
+  // OpenAI-compatibel
+  const msgs = [{ role: 'system', content: system }, ...messages.map((m) => {
+    if (m.role === 'tool') return { role: 'tool', tool_call_id: m.tool_call_id, content: String(m.content).slice(0, 20000) };
+    if (m.role === 'assistant' && m.tool_calls?.length) return { role: 'assistant', content: m.content || null, tool_calls: m.tool_calls.map((t) => ({ id: t.id, type: 'function', function: { name: t.name, arguments: JSON.stringify(t.input) } })) };
+    return { role: m.role, content: m.content };
+  })];
+  const url = base.includes('openai.azure.com') && !base.includes('/chat/completions') ? `${base}/chat/completions?api-version=2024-10-21` : `${base}/chat/completions`;
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}`, 'api-key': cfg.apiKey },
+    body: JSON.stringify({ model: cfg.model, temperature, max_tokens: maxTokens, messages: msgs, tools: tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } })) }) });
+  if (!res.ok) throw await providerError(res);
+  const data = await res.json();
+  const msg = data.choices?.[0]?.message || {};
+  const toolCalls = (msg.tool_calls || []).map((t) => { let input = {}; try { input = JSON.parse(t.function.arguments || '{}'); } catch { /* leeg */ } return { id: t.id, name: t.function.name, input }; });
+  return { text: (msg.content || '').trim(), toolCalls, stop: data.choices?.[0]?.finish_reason };
+}
 
 async function chat(env, messages, { maxTokens = 1500, temperature = 0.2 } = {}) {
   const cfg = await aiConfig(env);

@@ -17,6 +17,7 @@ import * as settings from './views/settings.js';
 import * as mapView from './views/map.js';
 import * as bulk from './views/bulk.js';
 import * as tonight from './views/tonight.js';
+import * as chat from './views/chat.js';
 import * as insights from './views/insights.js';
 import * as manage from './views/manage.js';
 import * as producers from './views/producers.js';
@@ -24,6 +25,7 @@ import * as producers from './views/producers.js';
 const NAV = [
   { path: '/kelder', label: 'Kelder', ico: '🍷' },
   { path: '/toevoegen', label: 'Toevoegen', ico: '＋' },
+  { path: '/sommelier', label: 'Sommelier', ico: '🍷' },
   { path: '/vanavond', label: 'Vanavond', ico: '🥂' },
   { path: '/historie', label: 'Historie', ico: '📜' },
   { path: '/meer', label: 'Meer', ico: '☰' },
@@ -37,6 +39,7 @@ const ROUTES = [
   { pattern: /^\/toevoegen$/, view: add },
   { pattern: /^\/bulk$/, view: bulk },
   { pattern: /^\/vanavond$/, view: tonight },
+  { pattern: /^\/sommelier$/, view: chat },
   { pattern: /^\/inzichten$/, view: insights },
   { pattern: /^\/voorraad$/, view: manage },
   { pattern: /^\/wijn\/([^/]+)\/bewerken$/, view: add, mode: 'edit' },
@@ -81,6 +84,7 @@ function renderNav(active) {
 function renderMore(main) {
   const user = session.user;
   const links = [
+    ['/sommelier', '🍷', 'De Sommelier', 'Chat: vraag, etiket of wijnkaart — alleen over wijn'],
     ['/spijs', '🍽️', 'Spijs & wijn', 'Welke wijn bij welk gerecht — en andersom'],
     ['/inzichten', '👅', 'Inzichten', 'Smaakprofiel van Angela en Tije, prijs-kwaliteit, jaaroverzicht'],
     ['/voorraad', '🛒', 'Voorraad & beheer', 'Aankooplijst met budget, inventarisatie, cadeau-register'],

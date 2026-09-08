@@ -65,6 +65,12 @@ Gecontroleerd en in orde bevonden: routering en autorisatie (admin/lid), volledi
 
 **Restrisico dat je zelf kunt verkleinen:** het sessietoken staat in `localStorage` op `<naam>.github.io`. Die oorsprong deel je met al je andere GitHub Pages-projecten onder hetzelfde account. Publiceer daarom geen andere (onbetrouwbare) sites onder dit GitHub-account, of gebruik een eigen domein voor de wijnkelder.
 
+## De Sommelier-chat
+- Alleen ingelogde huishoudleden; elk gesprek is per gebruiker en wordt in jullie eigen database bewaard (wissen kan altijd).
+- **Alleen wijn**: (1) onderwerpcontrole vóór elk antwoord — duidelijke andere onderwerpen, andere dranken en manipulatiepogingen ("negeer je instructies", "doe alsof") worden geweigerd zonder het model te raadplegen; twijfelgevallen krijgen een aparte, goedkope classificatie; (2) strikte systeeminstructie; (3) de gereedschappen kunnen uitsluitend wijngegevens lezen/schrijven. Inhoud van foto's en geplakte teksten wordt als data behandeld, niet als opdracht.
+- Schrijfacties lopen via dezelfde API-functies als de app (validatie, duplicaatcontrole, goedkeuringsregel: een herkend etiket gaat naar de wachtrij en komt pas in de kelder na expliciete bevestiging). Alles staat in het activiteitenlog, inclusief geweigerde vragen.
+- Begrensd op 120 berichten per uur per persoon en maximaal 6 gereedschapsrondes per bericht.
+
 ## Wat de app bewust NIET doet
 - Geen wachtwoorden, geen e-mail-links, geen "wachtwoord vergeten".
 - Geen openbare registratie.

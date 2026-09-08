@@ -289,3 +289,15 @@ CREATE TABLE IF NOT EXISTS inventory_sessions (
   seen         INTEGER,
   missing      TEXT                  -- JSON: fles-id's die niet gezien zijn
 );
+
+-- Chat met de Sommelier (migratie 0005). Bestaande installaties: zie migrations/0005_sommelier_chat.sql
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role        TEXT NOT NULL,
+  content     TEXT NOT NULL,
+  image_key   TEXT,
+  actions     TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_id, created_at);

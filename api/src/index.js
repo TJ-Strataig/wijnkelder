@@ -8,6 +8,7 @@ import * as origin from './origin.js';
 import * as intake from './intake.js';
 import * as insights from './insights.js';
 import * as som from './sommelier.js';
+import * as agent from './agent.js';
 
 const routes = [];
 function route(method, pattern, handler, { auth: needsAuth = true, admin = false } = {}) {
@@ -92,6 +93,9 @@ route('POST',   '/api/notifications/subscribe', som.subscribePush);
 route('DELETE', '/api/notifications/subscribe/:id', som.unsubscribePush);
 route('POST',   '/api/notifications/test', som.testPush);
 route('POST',   '/api/sommelier/tonight', som.tonight);
+route('POST',   '/api/sommelier/chat', agent.chat);
+route('GET',    '/api/sommelier/chat', agent.history);
+route('DELETE', '/api/sommelier/chat', agent.clearHistory);
 route('POST',   '/api/sommelier/restaurant', som.restaurant);
 
 route('GET',    '/api/map', origin.mapData);

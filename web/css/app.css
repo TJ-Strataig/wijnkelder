@@ -411,3 +411,36 @@ a[href^="http"], code { overflow-wrap: anywhere; }
   /* Hero/login op kleine schermen */
   .hero { min-height: auto; padding: 1rem 0; }
 }
+
+/* ===== Sommelier-chat ======================================================= */
+.chat-main { display: flex; flex-direction: column; min-height: calc(100dvh - 60px); }
+.chat-head { margin-bottom: 0.5rem; }
+.chat-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; padding: 0.5rem 0.2rem; -webkit-overflow-scrolling: touch; min-height: 40dvh; max-height: calc(100dvh - 300px); }
+.chat-msg { max-width: 85%; padding: 0.65rem 0.9rem; border-radius: 16px; line-height: 1.4; font-size: 0.95rem; box-shadow: var(--shadow); }
+.chat-msg.me { align-self: flex-end; background: var(--bordeaux); color: #fff; border-bottom-right-radius: 4px; }
+.chat-msg.som { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.chat-p { margin: 0; }
+.chat-p + .chat-p { margin-top: 0.3rem; }
+.chat-img { max-width: 220px; max-height: 220px; border-radius: 10px; display: block; margin-bottom: 0.4rem; }
+.chat-actions { font-size: 0.7rem; color: var(--muted); margin-top: 0.4rem; border-top: 1px dashed var(--line); padding-top: 0.3rem; }
+.chat-msg.me .chat-actions, .chat-msg.me .chat-time { color: rgba(255,255,255,0.75); }
+.chat-time { font-size: 0.65rem; color: var(--muted); margin-top: 0.25rem; text-align: right; }
+.chat-quick { margin: 0.4rem 0; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+.chat-quick::-webkit-scrollbar { display: none; }
+.chat-quick .chip { white-space: nowrap; flex-shrink: 0; }
+.chat-composer { position: sticky; bottom: calc(60px + env(safe-area-inset-bottom)); background: var(--cream); padding: 0.4rem 0 0.2rem; }
+@media (min-width: 900px) { .chat-composer { bottom: 0; } .chat-log { max-height: calc(100dvh - 260px); } }
+.chat-row { display: flex; gap: 0.3rem; align-items: flex-end; background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 0.3rem 0.4rem; }
+.chat-input { flex: 1; border: 0; background: transparent; resize: none; padding: 0.55rem 0.4rem; max-height: 120px; font-size: max(16px, 1rem); }
+.chat-input:focus { outline: none; }
+.chat-btn { min-height: 40px; width: 40px; font-size: 1.15rem; color: var(--muted); }
+.chat-btn.recording { color: var(--bad); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: 0.4; } }
+.chat-send { min-height: 40px; width: 44px; padding: 0; justify-content: center; border-radius: 50%; }
+.chat-preview { position: relative; display: inline-block; margin: 0 0 0.3rem 0.5rem; }
+.chat-preview img { height: 72px; border-radius: 8px; border: 1px solid var(--line); }
+.chat-preview .icon-btn { position: absolute; top: -8px; right: -8px; background: var(--card); border: 1px solid var(--line); border-radius: 50%; width: 26px; height: 26px; min-height: 0; padding: 0; font-size: 0.8rem; color: var(--ink); }
+.typing { display: flex; gap: 4px; padding: 0.8rem 1rem; }
+.typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
+.typing span:nth-child(2) { animation-delay: 0.2s; } .typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
