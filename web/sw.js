@@ -1,7 +1,7 @@
 // Service worker: maakt de app installeerbaar en laadt de schil offline. API-verzoeken worden nooit gecachet.
-const CACHE = 'wijnkelder-shell-v4';
+const CACHE = 'wijnkelder-shell-v6';
 const SHELL = [
-  './', './index.html', './config.js', './manifest.webmanifest', './css/app.css', './css/app.css?v=4', './icons/icon.svg', './icons/apple-touch-icon.png',
+  './', './index.html', './config.js', './manifest.webmanifest', './css/app.css', './css/app.css?v=6', './icons/icon.svg', './icons/apple-touch-icon.png',
   './js/app.js', './js/api.js', './js/auth.js', './js/util.js', './js/pairings.js', './js/data.js',
   './js/views/login.js', './js/views/cellar.js', './js/views/wine.js', './js/views/add.js', './js/views/history.js',
   './js/views/pairing.js', './js/views/stats.js', './js/views/wishlist.js', './js/views/admin.js', './js/views/settings.js', './js/views/map.js', './js/views/bulk.js', './js/views/tonight.js', './js/views/chat.js', './js/views/insights.js', './js/views/manage.js', './js/barcode.js', './js/views/producers.js', './js/minimap.js',
