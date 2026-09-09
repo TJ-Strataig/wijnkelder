@@ -67,6 +67,7 @@ Ok "wrangler geinstalleerd"
 gh auth status 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { Info "Er opent een browser om in te loggen bij GitHub..."; gh auth login --web --git-protocol https }
 $GhUser = gh api user -q .login
+$GhHost = "$GhUser.github.io".ToLower()   # webadressen zijn altijd kleine letters
 Ok "GitHub: ingelogd als $GhUser"
 
 Push-Location api
@@ -120,15 +121,20 @@ Ok "Cloudflare: ingelogd"
 ""; Bold "3/8 GitHub-repository"
 $RepoName = Read-Host "  Naam van de repository [wijnkelder]"
 if ([string]::IsNullOrWhiteSpace($RepoName)) { $RepoName = 'wijnkelder' }
-$PagesOrigin = "https://$GhUser.github.io"
-$PagesUrl = "$PagesOrigin/$RepoName/"
+$PagesOrigin = "https://$GhHost"
+$PagesUrl = "$PagesOrigin/$($RepoName.ToLower())/"
 
 if (-not (Test-Path .git)) { git init -q -b main }
 git remote get-url origin 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) {
   gh repo view "$GhUser/$RepoName" 2>$null | Out-Null
   if ($LASTEXITCODE -eq 0) { git remote add origin "https://github.com/$GhUser/$RepoName.git"; Ok "Bestaande repository gekoppeld: $GhUser/$RepoName" }
-  else { gh repo create $RepoName --private --source=. --remote=origin | Out-Null; Ok "Prive-repository aangemaakt: $GhUser/$RepoName" }
+  else {
+    # GitHub Pages is op een gratis account alleen beschikbaar voor OPENBARE repositories.
+    # De code bevat geen geheimen (die staan in Cloudflare); de app zelf is beveiligd met passkeys.
+    gh repo create $RepoName --public --source=. --remote=origin | Out-Null
+    Ok "Openbare repository aangemaakt: $GhUser/$RepoName (nodig voor gratis GitHub Pages; bevat geen geheimen)"
+  }
 } else { Ok "Repository al gekoppeld: $(git remote get-url origin)" }
 
 # -----------------------------------------------------------------------------
@@ -167,8 +173,8 @@ Ok "Databaseschema toegepast"
 # -----------------------------------------------------------------------------
 ""; Bold "5/8 Configuratie"
 Set-Toml wrangler.toml 'ORIGIN' $PagesOrigin
-Set-Toml wrangler.toml 'RP_ID' "$GhUser.github.io"
-Ok "wrangler.toml: ORIGIN=$PagesOrigin, RP_ID=$GhUser.github.io"
+Set-Toml wrangler.toml 'RP_ID' $GhHost
+Ok "wrangler.toml: ORIGIN=$PagesOrigin, RP_ID=$GhHost"
 
 # -----------------------------------------------------------------------------
 ""; Bold "6/8 API publiceren naar Cloudflare"
@@ -212,6 +218,16 @@ Ok "web/config.js: API_BASE=$WorkerUrl"
 
 # -----------------------------------------------------------------------------
 ""; Bold "8/8 Webapp publiceren naar GitHub Pages"
+$vis = gh repo view "$GhUser/$RepoName" --json visibility -q .visibility 2>$null
+if ($vis -eq 'PRIVATE') {
+  Warn "De repository is prive. GitHub Pages werkt op een gratis account alleen voor openbare repositories."
+  $antw = Read-Host "  Repository openbaar maken? De code bevat geen geheimen; de app blijft beveiligd met passkeys. [J/n]"
+  if ($antw -eq '' -or $antw -match '^[JjYy]') { gh repo edit "$GhUser/$RepoName" --visibility public --accept-visibility-change-consequences 2>$null | Out-Null; Ok "Repository is nu openbaar" }
+  else { Warn "Repository blijft prive; GitHub Pages werkt dan alleen met GitHub Pro." }
+}
+
+# Vaste pakketversies vastleggen (lockfile) zodat de deploy-workflow met 'npm ci' werkt en niet ongemerkt nieuwe versies binnenhaalt.
+if (-not (Test-Path 'api/package-lock.json')) { Push-Location api; npm install --package-lock-only --silent --no-fund --no-audit 2>&1 | Out-Null; Pop-Location }
 git add -A
 git -c user.name="Wijnkelder setup" -c user.email="setup@wijnkelder.local" commit -qm "Wijnkelder: installatie en configuratie" 2>$null | Out-Null
 git push -qu origin main
@@ -221,6 +237,9 @@ Ok "Code gepusht"
 gh api -X POST "repos/$GhUser/$RepoName/pages" -f build_type=workflow 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { gh api -X PUT "repos/$GhUser/$RepoName/pages" -f build_type=workflow 2>$null | Out-Null }
 Ok "GitHub Pages ingesteld op GitHub Actions"
+Info "Workflow (opnieuw) starten zodat de webapp gepubliceerd wordt..."
+Start-Sleep -Seconds 3
+gh workflow run "Webapp naar GitHub Pages" --repo "$GhUser/$RepoName" 2>$null | Out-Null
 
 Info "Wachten tot de Pages-workflow klaar is (ca. 1 minuut)..."
 Start-Sleep -Seconds 8

@@ -145,7 +145,7 @@ export async function render(main, { navigate }) {
       nt.append(el('div', { class: 'row' },
         el('button', { class: `btn ${isOn ? 'ghost' : 'gold'} sm`, type: 'button', text: isOn ? 'Uitschakelen op dit apparaat' : '🔔 Pushmeldingen inschakelen', onClick: async () => {
           try {
-            if (isOn) { const subs = d.subscriptions; await current.unsubscribe(); for (const s of subs) await api.del(`/api/notifications/subscribe/${s.id}`).catch(() => {}); toast('Uitgeschakeld'); }
+            if (isOn) { const mine = d.subscriptions.filter((s) => s.endpoint_hash === hashEndpoint(current.endpoint)); await current.unsubscribe(); for (const s of mine) await api.del(`/api/notifications/subscribe/${s.id}`).catch(() => {}); toast('Uitgeschakeld op dit apparaat'); }
             else {
               const perm = await Notification.requestPermission(); if (perm !== 'granted') return toast('Geen toestemming voor meldingen', 'error');
               const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(d.vapid_public_key) });
@@ -184,3 +184,6 @@ function urlB64ToUint8Array(s) {
   const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
+
+// Zelfde vingerafdruk als de server gebruikt om dit apparaat te herkennen
+function hashEndpoint(ep) { let h = 0; for (const c of ep || '') h = (h * 31 + c.charCodeAt(0)) >>> 0; return h.toString(36); }

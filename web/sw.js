@@ -1,5 +1,5 @@
 // Service worker: maakt de app installeerbaar en laadt de schil offline. API-verzoeken worden nooit gecachet.
-const CACHE = 'wijnkelder-shell-v6';
+const CACHE = 'wijnkelder-shell-v7';
 const SHELL = [
   './', './index.html', './config.js', './manifest.webmanifest', './css/app.css', './css/app.css?v=6', './icons/icon.svg', './icons/apple-touch-icon.png',
   './js/app.js', './js/api.js', './js/auth.js', './js/util.js', './js/pairings.js', './js/data.js',

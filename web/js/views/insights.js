@@ -75,12 +75,12 @@ async function valueView(body) {
 
 async function yearView(body) {
   let d = await api.get('/api/insights/year'); clear(body);
-  const head = el('div', { class: 'row between' }, el('h2', { style: { margin: 0 }, text: `Wijnjaar ${d.year}` }), null);
+  const title = el('h2', { style: { margin: 0 }, text: `Wijnjaar ${d.year}` });
   const sel = select((d.years.length ? d.years : [String(d.year)]).map((y) => [y, y]), { value: String(d.year), style: { width: 'auto' } });
-  head.lastChild?.remove?.(); head.append(sel);
+  const head = el('div', { class: 'row between' }, title, sel);
   const content = el('div');
   body.append(head, content);
-  sel.addEventListener('change', async () => { d = await api.get(`/api/insights/year?year=${sel.value}`); head.firstChild.textContent = `Wijnjaar ${d.year}`; draw(); });
+  sel.addEventListener('change', async () => { d = await api.get(`/api/insights/year?year=${sel.value}`); title.textContent = `Wijnjaar ${d.year}`; draw(); });
   function draw() {
     clear(content);
     const t = d.totals;

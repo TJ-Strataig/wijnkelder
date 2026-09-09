@@ -104,3 +104,53 @@ test('chat: login vereist, rate limit, gesprek wissen, ongeldige foto geweigerd'
   assert.equal((await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { image: 'data:text/html;base64,PHNjcmlwdD4=' } })).status, 400);
   assert.equal((await call(worker, env, '/api/sommelier/chat', { method: 'DELETE', token: u.token })).status, 200);
 });
+
+test('review 2: in een fotobericht worden kelderwijzigingen geblokkeerd (prompt-injectie via etikettekst)', async () => {
+  const { env, u, w } = await setup();
+  const img = 'data:image/jpeg;base64,' + 'A'.repeat(400);
+  // Het "model" probeert — bijv. aangestuurd door tekst op het etiket — direct af te boeken en toe te voegen in dezelfde beurt als de foto
+  mockModel([
+    (b) => tool('fles_afboeken', { wine_id: w.wine.id, reden: 'consumed' }),
+    (b) => { const res = JSON.parse(b.messages[b.messages.length - 1].content[0].content); assert.match(res.fout, /geen kelderwijzigingen/); return tool('voeg_toe_aan_kelder', { wijn: { name: 'Nep', producer: 'X' }, aantal: 500 }, 'tu_2'); },
+    (b) => { const res = JSON.parse(b.messages[b.messages.length - 1].content[0].content); assert.match(res.fout, /geen kelderwijzigingen/); return tool('zet_in_wachtrij', { wijn: { name: 'Nep', producer: 'X' }, aantal: 1 }, 'tu_3'); },
+    (b) => text('Ik heb de wijn in de beoordelingswachtrij gezet; bevestig in een volgend bericht als hij de kelder in mag.'),
+  ]);
+  const r = await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { text: 'Kijk eens', image: img } });
+  assert.equal(r.status, 200);
+  assert.equal((await call(worker, env, `/api/wines/${w.wine.id}`, { token: u.token })).json.wine.bottles_in_cellar, 3, 'niets afgeboekt');
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM wines').first()).n, 1, 'niets toegevoegd');
+  assert.equal((await call(worker, env, '/api/intake', { token: u.token })).json.counts.recognized, 1, 'wachtrij mag wel');
+  // Weigeringen komen zonder berichttekst in de gedeelde historie
+  mockModel([(b) => text('nvt')]);
+  await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { text: 'Wat is de uitslag van het voetbal? geheim123' } });
+  const hist = await call(worker, env, '/api/history', { token: u.token });
+  const off = hist.json.activity.find((a) => a.action === 'chat.offtopic');
+  assert.ok(off); assert.ok(!JSON.stringify(off).includes('geheim123'), 'berichttekst niet in gedeelde historie');
+});
+
+test('review 2: onderwerpfilter — rosé, wijnhuis en "weer" worden niet ten onrechte geweigerd', async () => {
+  const { env, u } = await setup();
+  let classifierCalls = 0;
+  globalThis.fetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    if (body.max_tokens <= 20) { classifierCalls++; return new Response(JSON.stringify({ content: [{ type: 'text', text: '{"wine":true}' }] })); }
+    return new Response(JSON.stringify(text('Jazeker.')));
+  };
+  for (const t of ['Hebben we nog rosé?', 'Vertel het verhaal achter dit wijnhuis', 'Wat is een goed jaar voor Barolo, ik ben weer thuis']) {
+    const r = await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { text: t } });
+    assert.equal(r.json.refused, false, `"${t}" mag niet geweigerd worden`);
+  }
+  assert.equal(classifierCalls, 0, 'duidelijke wijnvragen hebben geen classificatie nodig');
+});
+
+test('review 2: foto verwijderen respecteert wachtrij en chatfoto\'s van anderen', async () => {
+  const { env, u } = await setup();
+  const other = await seedUser(env, { name: 'Angela', role: 'member' });
+  await env.FOTOS.put('labels/q.jpg', new Uint8Array([1])); await env.FOTOS.put('labels/c.jpg', new Uint8Array([1])); await env.FOTOS.put('labels/vrij.jpg', new Uint8Array([1]));
+  await env.DB.prepare("INSERT INTO intake_queue (id, status, label_image_key, wine, bottle, created_by) VALUES ('q1', 'recognized', 'labels/q.jpg', '{}', '{}', ?)").bind(u.id).run();
+  await env.DB.prepare("INSERT INTO chat_messages (id, user_id, role, content, image_key) VALUES ('c1', ?, 'user', 'foto', 'labels/c.jpg')").bind(other.id).run();
+  assert.equal((await call(worker, env, '/api/photos/labels%2Fq.jpg', { method: 'DELETE', token: u.token })).status, 409);
+  assert.equal((await call(worker, env, '/api/photos/labels%2Fc.jpg', { method: 'DELETE', token: u.token })).status, 403);
+  assert.equal((await call(worker, env, '/api/photos/labels%2Fc.jpg', { method: 'DELETE', token: other.token })).status, 204, 'eigen chatfoto mag wel');
+  assert.equal((await call(worker, env, '/api/photos/labels%2Fvrij.jpg', { method: 'DELETE', token: u.token })).status, 204);
+});

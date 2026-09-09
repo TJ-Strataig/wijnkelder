@@ -22,6 +22,7 @@ export function scanBarcode() {
       try {
         const detector = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] });
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        if (done) { stream.getTracks().forEach((t) => t.stop()); return; } // dialoog al gesloten tijdens de toestemmingsvraag
         video.srcObject = stream;
         timer = setInterval(async () => {
           if (video.readyState < 2) return;

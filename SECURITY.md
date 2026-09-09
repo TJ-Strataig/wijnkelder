@@ -63,11 +63,28 @@ De volledige code (API, webapp, installatiescripts, workflows) is onderworpen aa
 
 Gecontroleerd en in orde bevonden: routering en autorisatie (admin/lid), volledige WebAuthn-flow (eenmalige challenges, atomische uitnodigingen, bootstrap-lockout, origin/RP-ID-controle), sessiebeheer, geparametriseerde SQL, foto-upload en -serving, XSS-oppervlak (geen `innerHTML`), CORS/CSRF, AES-GCM-versleuteling met unieke IV, geheimen (nooit gelogd of teruggegeven), AI-uitvoer als onbetrouwbare invoer, service worker, exports en rate limiting.
 
+### Tweede review (na de 12 slimme functies en de Sommelier-chat)
+Na de uitbreiding met kaart, wijnhuizen, bulkfoto's, wachtrij, duplicaatcontrole, pushmeldingen, inzichten en de Sommelier-chat is de volledige code opnieuw beoordeeld (beveiliging én codekwaliteit; testset nu 34 tests). **Er zijn geen uitbuitbare kwetsbaarheden gevonden**; alle eerdere oplossingen zijn intact. Vier verhardingspunten en vijf functionele fouten zijn opgelost:
+
+| # | Type | Bevinding | Oplossing |
+|---|---|---|---|
+| 1 | Verharding | De schrijfgereedschappen van de Sommelier (toevoegen, afboeken, verlanglijst) vertrouwden op het oordeel van het model dat de gebruiker had bevestigd. Tekst die óp een gefotografeerd etiket of wijnkaart staat komt via herkenningsresultaten bij het model terecht. | Serverregel: in een bericht met foto zijn kelderwijzigingen geblokkeerd; alleen de beoordelingswachtrij is toegestaan. Bevestigen kan uitsluitend in een volgend tekstbericht van de gebruiker zelf. |
+| 2 | Verharding | Geweigerde (niet-wijn) chatberichten werden met tekst in het gedeelde activiteitenlog gezet, terwijl chatgesprekken per persoon privé zijn. | Alleen het feit en de lengte worden gelogd, niet de tekst. |
+| 3 | Verharding | Foto's verwijderen controleerde alleen of een wijn de foto gebruikte; foto's uit de wachtrij of uit het chatgesprek van de ander konden worden verwijderd. | Wachtrijfoto's zijn beschermd (409); chatfoto's alleen door de eigenaar (403 voor anderen). |
+| 4 | Verharding | De onderwerpcontrole is heuristisch en niet waterdicht (kosten/beleidskwestie, geen beveiligingsgrens). | Geaccepteerd; de systeeminstructie bevat niets geheims en de gereedschappen kunnen alleen wijngegevens raken. |
+| 5 | Fout | Onderwerpfilter weigerde legitieme wijnvragen: `rosé` werd nooit herkend (accent en woordgrens), en de veelvoorkomende woorden `weer`, `verhaal` en `code` leidden tot weigering zonder classificatie. | Regex voor rosé hersteld; die woorden verwijderd; wijnhuis/producent/domein/château/wijngaard e.d. toegevoegd; in een lopend gesprek beslist de classificatie. |
+| 6 | Fout | Jaaroverzicht: de kop verdween en de jaarkeuzelijst werd bij wisselen leeggemaakt. | Kop en keuzelijst apart bijgehouden. |
+| 7 | Fout | "Pushmeldingen uitschakelen op dit apparaat" schakelde ze op álle apparaten uit. | Server geeft per abonnement een vingerafdruk terug; alleen het huidige apparaat wordt afgemeld. |
+| 8 | Fout | Streepjescodescanner: camera bleef aan als de dialoog werd gesloten tijdens de toestemmingsvraag. | Stream wordt direct gestopt als de dialoog al dicht is. |
+| 9 | Fout | Pagina Wijnhuizen markeerde "Kelder" in de navigatie. | Routematch gecorrigeerd. |
+
+Opnieuw gecontroleerd en in orde bevonden: router/autorisatie, WebAuthn-flow, SQL (alle waarden geparametriseerd, dynamische kolomnamen uit vaste lijsten), fotosleutels en ondertekende links, interne aanroepen vanuit de Sommelier (altijd met de al geauthenticeerde gebruiker, nooit via de router), AI-uitvoer als onbetrouwbare invoer, Web Push-cryptografie (RFC 8291/8188) en VAPID, SSRF-oppervlak, IDOR-scoping, exports (geen instellingen/sessies/chat/push), frontend (geen `innerHTML`, CSP zonder `unsafe-*`), supply chain (vaste actieversies, `npm ci`), installatiescripts.
+
 **Restrisico dat je zelf kunt verkleinen:** het sessietoken staat in `localStorage` op `<naam>.github.io`. Die oorsprong deel je met al je andere GitHub Pages-projecten onder hetzelfde account. Publiceer daarom geen andere (onbetrouwbare) sites onder dit GitHub-account, of gebruik een eigen domein voor de wijnkelder.
 
 ## De Sommelier-chat
 - Alleen ingelogde huishoudleden; elk gesprek is per gebruiker en wordt in jullie eigen database bewaard (wissen kan altijd).
-- **Alleen wijn**: (1) onderwerpcontrole vóór elk antwoord — duidelijke andere onderwerpen, andere dranken en manipulatiepogingen ("negeer je instructies", "doe alsof") worden geweigerd zonder het model te raadplegen; twijfelgevallen krijgen een aparte, goedkope classificatie; (2) strikte systeeminstructie; (3) de gereedschappen kunnen uitsluitend wijngegevens lezen/schrijven. Inhoud van foto's en geplakte teksten wordt als data behandeld, niet als opdracht.
+- **Alleen wijn**: (1) onderwerpcontrole vóór elk antwoord — duidelijke andere onderwerpen, andere dranken en manipulatiepogingen ("negeer je instructies", "doe alsof") worden geweigerd zonder het model te raadplegen; twijfelgevallen krijgen een aparte, goedkope classificatie; (2) strikte systeeminstructie; (3) de gereedschappen kunnen uitsluitend wijngegevens lezen/schrijven; (4) in een bericht met foto zijn kelderwijzigingen serverzijdig geblokkeerd (alleen de wachtrij), zodat tekst op een etiket of wijnkaart nooit een kelderactie kan uitlokken. Inhoud van foto's en geplakte teksten wordt als data behandeld, niet als opdracht.
 - Schrijfacties lopen via dezelfde API-functies als de app (validatie, duplicaatcontrole, goedkeuringsregel: een herkend etiket gaat naar de wachtrij en komt pas in de kelder na expliciete bevestiging). Alles staat in het activiteitenlog, inclusief geweigerde vragen.
 - Begrensd op 120 berichten per uur per persoon en maximaal 6 gereedschapsrondes per bericht.
 

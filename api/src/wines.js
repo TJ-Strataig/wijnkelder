@@ -544,11 +544,15 @@ export async function getPhoto(req, env, { params }) {
   });
 }
 
-export async function deletePhoto(req, env, { params }) {
+export async function deletePhoto(req, env, { params, user }) {
   const key = decodeURIComponent(params.key);
   if (!key.startsWith('labels/')) throw new HttpError(400, 'Ongeldige sleutel.');
   const inUse = await env.DB.prepare('SELECT id FROM wines WHERE label_image_key = ?').bind(key).first();
   if (inUse) throw new HttpError(409, 'Foto is nog gekoppeld aan een wijn.');
+  const queued = await env.DB.prepare("SELECT id FROM intake_queue WHERE label_image_key = ? AND status <> 'rejected'").bind(key).first();
+  if (queued) throw new HttpError(409, 'Foto hoort bij een item in de beoordelingswachtrij.');
+  const chat = await env.DB.prepare('SELECT user_id FROM chat_messages WHERE image_key = ?').bind(key).first();
+  if (chat && chat.user_id !== user.id) throw new HttpError(403, 'Deze foto hoort bij het gesprek van iemand anders.');
   await env.FOTOS.delete(key);
   return noContent();
 }

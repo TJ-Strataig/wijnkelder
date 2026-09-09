@@ -191,7 +191,7 @@ Daarna in de app: *Instellingen → Meldingen → Pushmeldingen inschakelen* (op
 ```bash
 cd api && npm test
 ```
-Draait 31 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
+Draait 34 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
 
 ## Lokaal ontwikkelen
 ```bash

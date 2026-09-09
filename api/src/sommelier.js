@@ -69,9 +69,12 @@ export async function restaurant(req, env, { user }) {
 
 // ---- Meldingen & push --------------------------------------------------------
 
+function hashEndpoint(ep) { let h = 0; for (const c of ep || '') h = (h * 31 + c.charCodeAt(0)) >>> 0; return h.toString(36); }
+
 export async function getNotificationPrefs(req, env, { user }) {
   const p = await env.DB.prepare('SELECT * FROM notification_prefs WHERE user_id = ?').bind(user.id).first();
-  const subs = (await env.DB.prepare('SELECT id, label, created_at, last_sent_at, failures FROM push_subscriptions WHERE user_id = ?').bind(user.id).all()).results;
+  const subs = (await env.DB.prepare('SELECT id, label, created_at, last_sent_at, failures, endpoint FROM push_subscriptions WHERE user_id = ?').bind(user.id).all()).results
+    .map((s) => ({ ...s, endpoint: undefined, endpoint_hash: hashEndpoint(s.endpoint) })); // alleen een vingerafdruk, nooit het endpoint zelf
   return json({ prefs: p || { weekly_day: 5, weekly_hour: 17, drink_window: 1, low_stock: 1 }, subscriptions: subs, vapid_public_key: env.VAPID_PUBLIC_KEY || null, push_available: !!(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY) });
 }
 export async function setNotificationPrefs(req, env, { user }) {
