@@ -35,6 +35,7 @@ alle leden zien en beheren dezelfde collectie.
 - **Topografische kaart** (OpenTopoMap, omschakelbaar naar stratenkaart) met een speld per wijn, gekleurd op type en met het aantal flessen. Spelden dicht bij elkaar worden gegroepeerd; tik om in te zoomen. Tik op een speld voor de wijnen op die plek en het wijnhuis.
 - Locaties worden automatisch bepaald (knop *Locaties bepalen*): eerst het wijnhuis zelf, anders appellatie, streek of land — de nauwkeurigheid staat erbij.
 - **Wijnhuizen** (in het menu): alle producenten uit de kelder, met een door de AI geschreven profiel (geschiedenis, ligging, eigenaar, wijnmaker, hectares, filosofie, bekendste wijnen, website) en ruimte voor eigen notities. Ook zichtbaar op de wijnpagina en op de kaart.
+- **Dubbele schrijfwijzen samenvoegen**: de app controleert of hetzelfde wijnhuis onder verschillende namen in de kelder staat ("Muga" / "Bodegas Muga" / "Ch. Margaux" / "Château Margaux", typefouten, afkortingen, rechtsvormen) en toont bovenaan Wijnhuizen per groep een voorstel: kies de juiste naam en voeg samen (wijnen, verlanglijst en AI-profiel gaan mee), of markeer ze als verschillende huizen. Bij het toevoegen van een wijn krijg je direct de bestaande naam voorgesteld; bij een zekere match (alleen andere spelling) wordt die automatisch overgenomen — ook bij bulk, wachtrij en Sommelier-chat. Handmatig samenvoegen kan via het paneel van een wijnhuis. Elke zondag verschijnt onder 🔔 een melding als er nieuwe dubbele schrijfwijzen zijn.
 
 **De Sommelier (chat-agent)** — tabblad 🍷 in de onderbalk. Praat in gewone taal, stuur een foto of spreek je vraag in. De Sommelier heeft gereedschappen en handelt zelf: kelder doorzoeken, etiket herkennen (→ beoordelingswachtrij, pas in de kelder na jouw bevestiging), wijnkaart lezen, fles afboeken met proefnotitie, drie flessen voor vanavond kiezen, verlanglijst, drinkvensters. Onder elk antwoord staat wat hij deed. **Hij praat uitsluitend over wijn**: drie lagen bewaking (onderwerpcontrole vóór elk antwoord, strikte instructie, gereedschappen die alleen wijngegevens kunnen) weren andere onderwerpen, andere dranken en pogingen om zijn instructies te omzeilen; geweigerde vragen staan in het activiteitenlog.
 
@@ -191,7 +192,7 @@ Daarna in de app: *Instellingen → Meldingen → Pushmeldingen inschakelen* (op
 ```bash
 cd api && npm test
 ```
-Draait 34 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
+Draait 40 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
 
 ## Lokaal ontwikkelen
 ```bash

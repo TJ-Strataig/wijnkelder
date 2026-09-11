@@ -128,7 +128,7 @@ async function runTool(env, user, name, input, ctx) {
       const dup = await findDuplicateWine(env, wijn);
       const payload = { ...wijn, confidence: undefined, estimated_price_min: undefined, estimated_price_max: undefined, label_image_key: dup.exact ? undefined : key, quantity: num(i.aantal, { min: 1, max: 500, int: true }) ?? 1, bottle, consumed, merge_into: dup.exact ? dup.exact.id : undefined };
       const fake = new Request('https://x/api/wines', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      try { const data = await (await createWine(fake, env, { user })).json(); return { ok: true, wine_id: data.wine.id, bijgeboekt_op_bestaande: !!dup.exact, flessen_in_kelder: data.wine.bottles_in_cellar, naar_historie: !!consumed }; }
+      try { const data = await (await createWine(fake, env, { user })).json(); return { ok: true, wine_id: data.wine.id, bijgeboekt_op_bestaande: !!dup.exact, flessen_in_kelder: data.wine.bottles_in_cellar, naar_historie: !!consumed, wijnhuis_geregistreerd_als: data.producer_adjusted ? `${data.producer_adjusted.to} (in plaats van "${data.producer_adjusted.from}", zo staat het huis al in de kelder)` : undefined }; }
       catch (e) { return { fout: e.message }; }
     }
     case 'fles_afboeken': {

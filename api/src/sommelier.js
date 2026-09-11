@@ -199,6 +199,22 @@ export async function runScheduledNotifications(env, now = new Date()) {
       results.low_stock = short.length;
     }
   }
+  // 4. Wijnhuizen met meerdere schrijfwijzen: zondag 11u een melding in de app (geen push), alleen als de situatie veranderd is
+  if (dow === 0 && hour === 11) {
+    try {
+      const { listVariants } = await import('./producers.js');
+      const { getSetting, setSetting } = await import('./util.js');
+      const { groups } = await (await listVariants(new Request('https://x/api/producers/varianten'), env)).json();
+      const sig = groups.map((g) => g.variants.map((v) => v.name).sort().join('|')).sort().join(';');
+      const last = await getSetting(env, 'producer_variants_notified');
+      if (groups.length && sig !== last) {
+        const ex = groups[0].variants.map((v) => `"${v.name}"`).join(' / ');
+        await addNotification(env, 'producers', '🏡 Mogelijk hetzelfde wijnhuis', `${groups.length} groep${groups.length === 1 ? '' : 'en'} met verschillende schrijfwijzen, bijv. ${ex}. Bekijk het voorstel bij Wijnhuizen.`, '#/wijnhuizen');
+        await setSetting(env, 'producer_variants_notified', sig, null);
+        results.producers = groups.length;
+      }
+    } catch (e) { console.error('producers', e.message); }
+  }
   return results;
 }
 

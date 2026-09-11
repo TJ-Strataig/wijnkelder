@@ -92,7 +92,7 @@ function renderMore(main) {
     ['/bulk', '📷', 'Bulk toevoegen', 'Meerdere etiketfoto\'s tegelijk; direct of later per fles goedkeuren'],
     ['/bulk?tab=queue', '🗂️', 'Beoordelingswachtrij', 'Flessen die nog gecontroleerd en goedgekeurd moeten worden'],
     ['/herkomst', '🗺️', 'Herkomst', 'Topografische kaart: waar komen onze wijnen vandaan?'],
-    ['/wijnhuizen', '🏡', 'Wijnhuizen', 'Informatie over de producenten in onze kelder'],
+    ['/wijnhuizen', '🏡', 'Wijnhuizen', 'Producenten in onze kelder; dubbele schrijfwijzen samenvoegen'],
     ['/statistieken', '📊', 'Statistieken', 'Waarde, verdeling, wat nu drinken'],
     ['/verlanglijst', '📝', 'Verlanglijst', 'Wijnen die we nog willen kopen'],
     user?.role === 'admin' ? ['/beheer', '👥', 'Beheer', 'Huishoudleden en uitnodigingen'] : null,

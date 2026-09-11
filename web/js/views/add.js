@@ -41,7 +41,7 @@ export async function render(main, { params, mode, navigate }) {
         if (go) navigate(`/wijn/${r.wine.id}`);
         return;
       }
-      if (r.hint) { for (const [k, v] of Object.entries({ name: r.hint.name, producer: r.hint.producer, country: r.hint.country })) if (v && !draft[k]) draft[k] = v; fillForm(); toast('Code onbekend in de kelder; productgegevens als startpunt ingevuld', 'ok'); }
+      if (r.hint) { for (const [k, v] of Object.entries({ name: r.hint.name, producer: r.hint.producer, country: r.hint.country })) if (v && !draft[k]) draft[k] = v; fillForm(); F.producer.dispatchEvent(new Event('change')); toast('Code onbekend in de kelder; productgegevens als startpunt ingevuld', 'ok'); }
       else toast(`Streepjescode ${code} vastgelegd; herken het etiket of vul de gegevens in`, 'ok');
     } catch (e) { toast(e.message, 'error'); }
   });
@@ -78,7 +78,7 @@ export async function render(main, { params, mode, navigate }) {
       const conf = wine.confidence !== null && wine.confidence !== undefined ? ` (zekerheid ${Math.round(wine.confidence * 100)}%)` : '';
       statusLine.textContent = `Herkend: ${wineTitle(wine)}${conf}. Controleer de gegevens hieronder.`;
       toast('Wijn herkend — controleer de gegevens', 'ok');
-      await checkDuplicate();
+      await Promise.all([checkDuplicate(), checkProducer()]);
       formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
       statusLine.textContent = '';
@@ -130,10 +130,12 @@ export async function render(main, { params, mode, navigate }) {
   });
 
   const dupNotice = el('div', { class: 'badge warn', hidden: true });
+  const prodNotice = el('div', { class: 'badge', hidden: true });
 
   formCard.append(
     el('div', { class: 'form-grid' },
       el('div', { class: 'full' }, field('Naam van de wijn *', F.name)), field('Producent', F.producer), field('Type *', F.type), field('Jaargang', F.vintage),
+      el('div', { class: 'full' }, prodNotice),
       field('Land', F.country), field('Streek', F.region), field('Appellatie / classificatie', F.appellation),
       el('div', { class: 'full' }, field('Druiven', F.grapes)), field('Alcohol %', F.alcohol), field('Zoetheid', F.sweetness), field('Body', F.body), field('Tannine', F.tannin), field('Zuren', F.acidity)),
     dupNotice,
@@ -199,6 +201,7 @@ export async function render(main, { params, mode, navigate }) {
       }
       invalidateWines();
       toast(editing ? 'Wijn bijgewerkt' : (destination?.isHistory() ? 'Wijn toegevoegd aan de historie 🥂' : 'Wijn toegevoegd aan de kelder 🍷'), 'ok');
+      if (result.producer_adjusted) toast(`Wijnhuis geregistreerd als "${result.producer_adjusted.to}" (jij typte "${result.producer_adjusted.from}")`);
       navigate(`/wijn/${result.wine.id}`);
     } catch (e) { toast(e.message, 'error'); saveBtn.disabled = false; }
   });
@@ -236,6 +239,22 @@ export async function render(main, { params, mode, navigate }) {
       } else dupNotice.hidden = true;
     } catch { /* stil */ }
   }
+  // Zelfde wijnhuis, andere schrijfwijze? Stel de naam voor waaronder het huis al in de kelder staat.
+  async function checkProducer() {
+    const typed = (F.producer.value || '').trim();
+    prodNotice.hidden = true; clear(prodNotice); delete draft.producer_as_typed;
+    if (!typed || (editing && typed === existing?.producer)) return;
+    try {
+      const r = await api.get(`/api/producers/suggest?name=${encodeURIComponent(typed)}`);
+      const m = r.matches[0]; if (!m) return;
+      prodNotice.className = m.score >= 1 ? 'badge ok' : 'badge';
+      prodNotice.append(`🏡 Dit wijnhuis staat in de kelder als `, el('strong', { text: m.name }), ` (${m.wines} wijn${m.wines === 1 ? '' : 'en'}${m.has_profile ? ', met profiel' : ''}) — ${m.reason}. `,
+        el('button', { class: 'btn sm gold', type: 'button', style: { marginLeft: '0.3rem' }, text: `Gebruik "${m.name}"`, onClick: () => { F.producer.value = m.name; draft.producer = m.name; prodNotice.hidden = true; checkDuplicate(); } }),
+        el('button', { class: 'btn sm ghost', type: 'button', style: { marginLeft: '0.3rem' }, text: 'Nee, ander huis', onClick: () => { draft.producer_as_typed = true; prodNotice.hidden = true; } }));
+      prodNotice.hidden = false;
+    } catch { /* stil */ }
+  }
+  F.producer.addEventListener('change', checkProducer);
   for (const k of ['name', 'producer', 'vintage', 'type']) F[k].addEventListener('change', () => { readForm(); checkDuplicate(); });
   fillForm();
 }

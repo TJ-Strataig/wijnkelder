@@ -9,6 +9,7 @@ import * as intake from './intake.js';
 import * as insights from './insights.js';
 import * as som from './sommelier.js';
 import * as agent from './agent.js';
+import * as producers from './producers.js';
 
 const routes = [];
 function route(method, pattern, handler, { auth: needsAuth = true, admin = false } = {}) {
@@ -103,6 +104,11 @@ route('POST',   '/api/map/geocode', origin.geocode);
 route('PUT',    '/api/wines/:id/location', origin.setWineLocation);
 route('GET',    '/api/producers', origin.listProducers);
 route('GET',    '/api/producers/by-name', origin.getProducer);
+route('GET',    '/api/producers/varianten', producers.listVariants);
+route('GET',    '/api/producers/suggest', producers.suggest);
+route('POST',   '/api/producers/merge', producers.mergeProducers);
+route('POST',   '/api/producers/distinct', producers.markDistinct);
+route('DELETE', '/api/producers/distinct', producers.resetDistinct);
 route('POST',   '/api/producers/profile', origin.buildProducerProfile);
 route('PATCH',  '/api/producers/:id', origin.updateProducer);
 

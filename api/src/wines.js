@@ -199,6 +199,9 @@ export async function checkDuplicate(req, env) {
 export async function createWine(req, env, { user }) {
   const body = await readJson(req, 200_000);
   const f = wineFields(body);
+  // Zelfde wijnhuis in een andere schrijfwijze ("muga" vs "Bodegas Muga")? Neem de bestaande schrijfwijze over, tenzij de app zegt dat de typing bewust is.
+  let producerAdjusted = null;
+  if (f.producer && !body.producer_as_typed) { const { canonicalProducer } = await import('./producers.js'); const c = await canonicalProducer(env, f.producer); if (c.adjusted_from) { f.producer = c.producer; producerAdjusted = c.adjusted_from; } }
   // Dubbele wijn? Dan geen tweede record, tenzij de app expliciet zegt dat het bewust is (allow_duplicate) of wil bijboeken (merge_into).
   const dup = await findDuplicateWine(env, { ...f, grapes: parseJsonField(f.grapes, []) });
   if (dup.exact && body.merge_into === dup.exact.id) {
@@ -221,8 +224,10 @@ export async function createWine(req, env, { user }) {
   const consumed = consumedFields(body.consumed);
   const bottleIds = await insertBottles(env, user, id, qty, bf, consumed);
   if (consumed && body.consumed.tasting && bottleIds.length) await insertTasting(env, user, id, bottleIds[0], { ...body.consumed.tasting, tasted_at: body.consumed.tasting.tasted_at || consumed.date, paired_with: body.consumed.tasting.paired_with, occasion: body.consumed.tasting.occasion || consumed.occasion });
-  await logActivity(env, user.id, consumed ? 'wine.created_consumed' : 'wine.created', 'wine', id, { name: f.name, quantity: qty, place: consumed?.place });
-  return getWine(req, env, { params: { id } });
+  await logActivity(env, user.id, consumed ? 'wine.created_consumed' : 'wine.created', 'wine', id, { name: f.name, quantity: qty, place: consumed?.place, producer_adjusted_from: producerAdjusted });
+  const res = await getWine(req, env, { params: { id } });
+  if (!producerAdjusted) return res;
+  const data = await res.json(); return json({ ...data, producer_adjusted: { from: producerAdjusted, to: f.producer } });
 }
 
 // Gegevens voor flessen die direct naar de historie gaan (bijv. gedronken in een restaurant of meteen na aankoop).

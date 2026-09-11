@@ -5,7 +5,7 @@ import { chatJson } from './ai.js';
 const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
 const USER_AGENT = 'Wijnkelder-huishoudapp/1.0 (persoonlijk gebruik)';
 
-function nameKey(s) {
+export function nameKey(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\b(chateau|domaine|domain|bodega|bodegas|cantina|tenuta|weingut|estate|winery|vineyards?|maison|azienda agricola|quinta)\b/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 }
 

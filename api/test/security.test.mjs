@@ -307,3 +307,21 @@ test('CSV-export neutraliseert formules', async () => {
   assert.ok(csv.text.includes(`"'+cmd|calc"`));
   assert.ok(csv.text.includes(`"'@SUM(1)"`));
 });
+
+test('AI-fouten: reden van de aanbieder wordt ingekort doorgegeven, sleutels gefilterd, 529 = overbelast', async () => {
+  const env = makeEnv(); const u = await seedUser(env);
+  await call(worker, env, '/api/ai/settings', { method: 'PUT', token: u.token, body: { provider: 'anthropic', model: 'claude-sonnet-4-5', api_key: 'sk-ant-api03-' + 'A'.repeat(40) } });
+  await call(worker, env, '/api/wines', { method: 'POST', token: u.token, body: { name: 'Reserva', producer: 'Muga', type: 'rood', vintage: 2019, quantity: 1 } });
+  const realFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: { type: 'invalid_request_error', message: 'max_tokens: 800 > 100 for sk-ant-geheim123456 model' } }), { status: 400 });
+    let r = await call(worker, env, '/api/sommelier/tonight', { method: 'POST', token: u.token, body: {} });
+    assert.equal(r.status, 502); assert.match(r.json.error, /weigerde het verzoek \(400\)/); assert.match(r.json.error, /max_tokens: 800/); assert.ok(!r.json.error.includes('geheim123456'));
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.' } }), { status: 400 });
+    r = await call(worker, env, '/api/sommelier/tonight', { method: 'POST', token: u.token, body: {} });
+    assert.match(r.json.error, /tegoed bij de AI-aanbieder is op/);
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: { type: 'overloaded_error', message: 'Overloaded' } }), { status: 529 });
+    r = await call(worker, env, '/api/sommelier/tonight', { method: 'POST', token: u.token, body: {} });
+    assert.match(r.json.error, /overbelast/);
+  } finally { globalThis.fetch = realFetch; }
+});

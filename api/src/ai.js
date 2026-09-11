@@ -119,7 +119,7 @@ async function callProvider(cfg, messages, { maxTokens, temperature }) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}`, 'api-key': cfg.apiKey },
-    body: JSON.stringify({ model: cfg.model, temperature, max_tokens: maxTokens, response_format: { type: 'json_object' }, messages }),
+    body: JSON.stringify({ model: cfg.model, ...openaiParams(cfg.model, maxTokens, temperature), response_format: { type: 'json_object' }, messages }),
   });
   if (!res.ok) throw await providerError(res);
   const data = await res.json();
@@ -129,10 +129,22 @@ async function callProvider(cfg, messages, { maxTokens, temperature }) {
 async function providerError(res) {
   const t = await res.text().catch(() => '');
   console.error('AI fout', res.status, t.slice(0, 500));
-  if (res.status === 401 || res.status === 403) return new HttpError(502, 'De AI-sleutel is ongeldig of heeft geen toegang. Controleer de sleutel in Instellingen.');
-  if (res.status === 404) return new HttpError(502, 'Het gekozen model bestaat niet (meer) bij deze aanbieder. Kies een ander model in Instellingen.');
-  if (res.status === 429) return new HttpError(502, 'De AI-aanbieder meldt een limiet (te veel verzoeken of tegoed op).');
-  return new HttpError(502, 'De AI-dienst gaf een fout terug. Probeer het later opnieuw.');
+  // Anthropic en OpenAI zetten de reden in error.message; die tonen we ingekort (nooit sleutels: die staan niet in foutteksten, maar we filteren voor de zekerheid)
+  let detail = '';
+  try { const j = JSON.parse(t); detail = String(j.error?.message || j.error?.type || j.message || ''); } catch { detail = t.replace(/<[^>]+>/g, ' '); }
+  detail = detail.replace(/\b(sk-[A-Za-z0-9_-]{6,}|Bearer\s+\S+)/g, '[sleutel]').replace(/\s+/g, ' ').trim().slice(0, 240);
+  const met = detail ? ` Melding van de aanbieder: "${detail}"` : '';
+  if (/credit balance|insufficient_quota|billing|exceeded your current quota|tegoed/i.test(detail)) return new HttpError(502, 'Het tegoed bij de AI-aanbieder is op. Vul het saldo aan (Anthropic: console.anthropic.com → Billing; OpenAI: platform.openai.com → Billing) en probeer het daarna opnieuw.' + met);
+  if (res.status === 401 || res.status === 403) return new HttpError(502, 'De AI-sleutel is ongeldig of heeft geen toegang. Controleer de sleutel in Instellingen.' + met);
+  if (res.status === 404) return new HttpError(502, 'Het gekozen model bestaat niet (meer) bij deze aanbieder. Kies een ander model in Instellingen.' + met);
+  if (res.status === 429) return new HttpError(502, 'De AI-aanbieder meldt een limiet (te veel verzoeken of tegoed op).' + met);
+  if (res.status === 529 || res.status === 503 || res.status >= 500) return new HttpError(502, `De AI-aanbieder is tijdelijk overbelast of gestoord (${res.status}). Probeer het over een minuut opnieuw.` + met);
+  return new HttpError(502, `De AI-aanbieder weigerde het verzoek (${res.status}).` + met);
+}
+
+// Nieuwere OpenAI-modellen (gpt-5, o-serie) accepteren geen temperature en willen max_completion_tokens.
+function openaiParams(model, maxTokens, temperature) {
+  return /^(gpt-5|o\d)/i.test(model || '') ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens, temperature };
 }
 
 // Haalt het eerste JSON-object uit een tekst (Claude zet er soms nog een zin of ```json omheen).
@@ -179,7 +191,7 @@ export async function chatWithTools(env, { system, messages, tools, maxTokens = 
   })];
   const url = base.includes('openai.azure.com') && !base.includes('/chat/completions') ? `${base}/chat/completions?api-version=2024-10-21` : `${base}/chat/completions`;
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}`, 'api-key': cfg.apiKey },
-    body: JSON.stringify({ model: cfg.model, temperature, max_tokens: maxTokens, messages: msgs, tools: tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } })) }) });
+    body: JSON.stringify({ model: cfg.model, ...openaiParams(cfg.model, maxTokens, temperature), messages: msgs, tools: tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } })) }) });
   if (!res.ok) throw await providerError(res);
   const data = await res.json();
   const msg = data.choices?.[0]?.message || {};
