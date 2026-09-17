@@ -1,0 +1,98 @@
+name: Wijnkelder publiceren
+
+on:
+  push:
+    branches: [main]
+    paths: ['api/**', 'web/**', '.github/workflows/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wijnkelder-production
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      api: ${{ steps.scope.outputs.api }}
+      web: ${{ steps.scope.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: scope
+        run: node api/scripts/release-scope.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  checks:
+    needs: changes
+    uses: ./.github/workflows/checks.yml
+
+  api:
+    needs: [changes, checks]
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cloudflare-instellingen controleren
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Stel CLOUDFLARE_API_TOKEN en CLOUDFLARE_ACCOUNT_ID veilig in als Actions-secrets. Publicatie is geblokkeerd."
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - name: API publiceren
+        run: npm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  web:
+    needs: [changes, checks, api]
+    # Een bewust overgeslagen API-taak is alleen toegestaan bij een web-only release.
+    if: >-
+      ${{ !cancelled() && needs.checks.result == 'success' &&
+          needs.changes.outputs.web == 'true' &&
+          (needs.api.result == 'success' ||
+           (needs.changes.outputs.api == 'false' && needs.api.result == 'skipped')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

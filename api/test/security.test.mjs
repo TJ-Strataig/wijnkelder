@@ -1,9 +1,9 @@
-// Beveiligingstests voor de Wijnkelder-API. Draaien met: node --test test/
+// Beveiligingstests met de echte WebAuthn-verifier. Draaien met: npm test.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../src/index.js';
 import { makeEnv, seedUser, call, req } from './harness.mjs';
-import { signPhotoUrl, encryptSecret, decryptSecret, sha256Hex } from '../src/util.js';
+import { signPhotoUrl, encryptSecret, decryptSecret } from '../src/util.js';
 
 const ORIGIN = 'https://tj-strataig.github.io';
 
@@ -69,50 +69,17 @@ test('CORS: vreemde Origin wordt geweigerd, ook met geldige token; zonder Origin
   assert.equal(good.headers.get('Cache-Control'), 'no-store');
 });
 
-test('bootstrap: fout wachtwoord geweigerd; na eerste gebruiker definitief dicht', async () => {
+test('echte WebAuthn-verifier weigert fake registratie zonder gebruiker, passkey of sessie aan te maken', async () => {
   const env = makeEnv();
-  let r = await call(worker, env, '/api/auth/register/options', { method: 'POST', body: { bootstrap: 'verkeerd', name: 'Hacker' } });
-  assert.equal(r.status, 403);
-  r = await call(worker, env, '/api/auth/register/options', { method: 'POST', body: { name: 'Hacker' } });
-  assert.equal(r.status, 400);
-  r = await call(worker, env, '/api/auth/register/options', { method: 'POST', body: { bootstrap: 'boot-1234', name: 'Tije' } });
-  assert.equal(r.status, 200);
-  const v = await call(worker, env, '/api/auth/register/verify', { method: 'POST', body: { challengeId: r.json.challengeId, response: { id: 'cred1', fakeChallenge: r.json.options.challenge } } });
-  assert.equal(v.status, 201);
-  assert.equal(v.json.user.role, 'admin');
-  // challenge is eenmalig
-  const replay = await call(worker, env, '/api/auth/register/verify', { method: 'POST', body: { challengeId: r.json.challengeId, response: { id: 'cred2', fakeChallenge: r.json.options.challenge } } });
-  assert.equal(replay.status, 400);
-  // bootstrap dicht
-  r = await call(worker, env, '/api/auth/register/options', { method: 'POST', body: { bootstrap: 'boot-1234', name: 'Tweede' } });
-  assert.equal(r.status, 403);
-});
-
-test('uitnodiging: eenmalig, verloopt, verkeerde token faalt, rol komt uit uitnodiging', async () => {
-  const env = makeEnv();
-  const admin = await seedUser(env);
-  const inv = await call(worker, env, '/api/admin/invites', { method: 'POST', token: admin.token, body: { name: 'Angela', role: 'member' } });
-  assert.equal(inv.status, 201);
-  const tok = inv.json.token;
-  // alleen hash in database
-  const row = await env.DB.prepare('SELECT token_hash FROM invites').first();
-  assert.notEqual(row.token_hash, tok);
-  assert.equal(row.token_hash, await sha256Hex(tok));
-  assert.equal((await call(worker, env, '/api/auth/register/options', { method: 'POST', body: { invite: tok + 'x' } })).status, 400);
-  const o = await call(worker, env, '/api/auth/register/options', { method: 'POST', body: { invite: tok } });
-  assert.equal(o.status, 200);
-  // tweede challenge met dezelfde uitnodiging (race) — beide options mogen, maar slechts één verify slaagt
-  const o2 = await call(worker, env, '/api/auth/register/options', { method: 'POST', body: { invite: tok } });
-  const v1 = await call(worker, env, '/api/auth/register/verify', { method: 'POST', body: { challengeId: o.json.challengeId, response: { id: 'c1', fakeChallenge: o.json.options.challenge } } });
-  assert.equal(v1.status, 201);
-  assert.equal(v1.json.user.role, 'member');
-  const v2 = await call(worker, env, '/api/auth/register/verify', { method: 'POST', body: { challengeId: o2.json.challengeId, response: { id: 'c2', fakeChallenge: o2.json.options.challenge } } });
-  assert.equal(v2.status, 400, 'uitnodiging mag niet twee keer werken');
-  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first()).n, 2);
-  // verlopen uitnodiging
-  const inv2 = await call(worker, env, '/api/admin/invites', { method: 'POST', token: admin.token, body: { name: 'Laat', role: 'member' } });
-  await env.DB.prepare("UPDATE invites SET expires_at = '2000-01-01T00:00:00.000Z' WHERE id = ?").bind(inv2.json.id).run();
-  assert.equal((await call(worker, env, '/api/auth/register/options', { method: 'POST', body: { invite: inv2.json.token } })).status, 400);
+  const options = await call(worker, env, '/api/auth/register/options', { method: 'POST', body: { bootstrap: 'boot-1234', name: 'Tije' } });
+  assert.equal(options.status, 200);
+  const body = { challengeId: options.json.challengeId, response: { id: 'cred1', fakeChallenge: options.json.options.challenge } };
+  assert.equal((await call(worker, env, '/api/auth/register/verify', { method: 'POST', body })).status, 400);
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first()).n, 0);
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM credentials').first()).n, 0);
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM sessions').first()).n, 0);
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM challenges').first()).n, 0);
+  assert.equal((await call(worker, env, '/api/auth/register/verify', { method: 'POST', body })).status, 400);
 });
 
 test('admin kan zichzelf niet degraderen/uitschakelen; lid verwijderen wist passkeys en sessies', async () => {

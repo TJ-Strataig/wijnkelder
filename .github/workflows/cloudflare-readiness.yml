@@ -1,0 +1,59 @@
+name: Cloudflare-toegang (zonder publicatie)
+
+on:
+  push:
+    branches-ignore: [main]
+    paths: ['.github/workflows/cloudflare-readiness.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  cloudflare:
+    needs: checks
+    runs-on: ubuntu-latest
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - name: Tokenstatus en resource-toegang lezen
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'NODE'
+          const { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ACCOUNT_ID: account } = process.env;
+          if (!token || !/^[a-f0-9]{32}$/.test(account || '')) {
+            throw new Error('CLOUDFLARE_API_TOKEN of een geldig CLOUDFLARE_ACCOUNT_ID ontbreekt.');
+          }
+          const response = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(30000),
+          });
+          if (!response.ok) throw new Error(`Tokencontrole mislukt: HTTP ${response.status}.`);
+          const body = await response.json();
+          if (body.success !== true || body.result?.status !== 'active') {
+            throw new Error('Het Cloudflare-gebruikerstoken is niet actief.');
+          }
+          console.log('Token is actief; geen tokenwaarde gelogd.');
+          NODE
+          npx --no-install wrangler deployments list
+          npx --no-install wrangler d1 info wijnkelder
+          npx --no-install wrangler r2 bucket info wijnkelder-fotos
+      - name: Reikwijdte vastleggen
+        run: |
+          echo "Token is actief en Worker-, D1- en R2-metadata zijn leesbaar." >> "$GITHUB_STEP_SUMMARY"
+          echo "Er is niets gepubliceerd of gewijzigd. Schrijfrechten en een echte deployment zijn hiermee niet bewezen." >> "$GITHUB_STEP_SUMMARY"

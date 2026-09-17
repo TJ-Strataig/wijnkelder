@@ -58,7 +58,7 @@ alle leden zien en beheren dezelfde collectie.
 **Extra's, geïnspireerd op wat CellarTracker, Vivino, InVintory, Cellarion en Sommo bieden**
 - Verlanglijst (met maximale prijs en notitie).
 - Kelderlocaties per fles, en filter op locatie.
-- Data-export als **CSV** (Excel) en **JSON** (volledige back-up) — geen lock-in.
+- Data-export als **CSV** (Excel) en **JSON** (collectie-export, geen volledige herstelback-up) — geen lock-in.
 - Installeerbaar als app (PWA) met donker thema.
 - Meerdere passkeys per persoon (telefoon + laptop), "overal uitloggen".
 - Wie-deed-wat activiteitenlog voor het huishouden.
@@ -77,11 +77,13 @@ GitHub Pages  ──(https)──▶  Cloudflare Worker (API)  ──▶  D1 (SQ
 - **web/** — pure HTML/CSS/JavaScript zonder build-stap of externe bibliotheken. Wordt door GitHub Actions naar GitHub Pages gepubliceerd.
 - **api/** — Cloudflare Worker (gratis tier ruim voldoende voor een huishouden) met passkey-authenticatie via `@simplewebauthn/server`.
 
-## Snelle installatie met het script (aanbevolen, ±10 minuten)
+## Nieuwe installatie met het script
 
-Het script doet alle terminal-stappen voor je: GitHub-repo, GitHub Pages, Cloudflare-database en fotobucket, geheimen, configuratie invullen en publiceren. Je hoeft alleen in te loggen als het daarom vraagt (er opent een browservenster voor GitHub en voor Cloudflare).
+Het script maakt een nieuwe installatie: GitHub-repo, GitHub Pages, Cloudflare-database en fotobucket, Worker-geheimen, configuratie en publicatie. Het wijzigt bestanden en live instellingen en publiceert daadwerkelijk; gebruik het niet om alleen lokaal verder te ontwikkelen aan de bestaande installatie.
 
-**Vooraf nodig (eenmalig):** een GitHub-account, een gratis [Cloudflare](https://dash.cloudflare.com/sign-up)-account, [Node.js 20+](https://nodejs.org) en [GitHub CLI](https://cli.github.com) (het script installeert `gh` zelf als Homebrew of winget aanwezig is).
+**Vooraf nodig (eenmalig):** een GitHub-account, een gratis [Cloudflare](https://dash.cloudflare.com/sign-up)-account, [Node.js 24+](https://nodejs.org) en [GitHub CLI](https://cli.github.com) (het script installeert `gh` zelf als Homebrew of winget aanwezig is). Houd `api/package-lock.json` aanwezig: pakketten worden met `npm ci` geinstalleerd.
+
+Voor de gezamenlijke publicatieworkflow moeten ook de twee hieronder beschreven **Actions repository-secrets** zijn ingericht. Het script controleert alleen hun namen en stopt voor het pushen als ze ontbreken; het kopieert geen lokaal Cloudflare-token naar GitHub.
 
 Open de map in VS Code en draai in de terminal:
 
@@ -103,23 +105,23 @@ Aan het einde toont het script het adres van de app en een **opstartwachtwoord**
 2. **Instellingen → AI-sommelier** → Anthropic (Claude) kiezen, model kiezen, API-sleutel van console.anthropic.com plakken → *Verbinding testen*.
 3. **Beheer → Lid uitnodigen** → link naar Angela sturen.
 
-Het script is veilig opnieuw te draaien: wat al bestaat wordt overgeslagen. Je kunt het ook aan de AI-assistent in VS Code geven ("draai setup.sh en help me bij de vragen").
+Het script slaat sommige bestaande resources over, maar voert ook configuratie-, database- en publicatiestappen uit. Herhaal het niet blind bij een bestaande installatie; controleer eerst de reeds uitgevoerde stappen.
 
 ## Handmatige installatie (als je liever elke stap zelf doet, ±30 minuten)
 
 ### 1. Repository op GitHub
 1. Maak een nieuwe **openbare** repository, bijv. `wijnkelder`, en upload de inhoud van deze map. (GitHub Pages is op een gratis account alleen beschikbaar voor openbare repositories. Dat is veilig: de code bevat geen geheimen — die staan als secrets in Cloudflare — en de app zelf is afgeschermd met passkeys. Wil je de code toch privé houden, dan is GitHub Pro nodig.)
 2. Ga naar **Settings → Pages** en kies bij *Source*: **GitHub Actions**.
-3. Na de eerste push draait de workflow *Webapp naar GitHub Pages*. Het adres wordt `https://<gebruikersnaam>.github.io/wijnkelder/`.
+3. Richt Cloudflare en de Actions-secrets hieronder in voordat je publiceert. De workflow *Wijnkelder publiceren* controleert de code en publiceert eerst de API, daarna de website. Het adres wordt `https://<gebruikersnaam>.github.io/wijnkelder/`.
 
 > **Belangrijk voor passkeys:** het adres van de webapp bepaalt de *RP ID*. Voor `https://tije.github.io/wijnkelder/` is dat `tije.github.io`. Verhuis je later naar een eigen domein, dan moeten alle passkeys opnieuw worden aangemaakt.
 
 ### 2. Cloudflare (API, database, foto-opslag)
-Maak een gratis account op cloudflare.com en installeer Node.js 20+.
+Maak een gratis account op cloudflare.com en installeer Node.js 24+.
 
 ```bash
 cd api
-npm install
+npm ci
 npx wrangler login
 
 # Database en fotobucket aanmaken
@@ -146,7 +148,7 @@ npm run deploy
 Noteer het adres, bijv. `https://wijnkelder-api.<subdomein>.workers.dev`.
 
 ### 3. Webapp koppelen aan de API
-Zet in `web/config.js` het Worker-adres in `API_BASE` en push naar `main`. Klaar.
+Zet bij een **nieuwe installatie** in `web/config.js` het Worker-adres in `API_BASE`. Richt de Actions-secrets hieronder in en push daarna naar `main`. Bij een bestaande installatie blijven `web/config.js` en de waarden in `api/wrangler.toml` behouden.
 
 ### 4. Eerste beheerder
 Open de webapp. Omdat er nog geen gebruikers zijn, verschijnt **Eerste keer instellen**: vul je naam en het `BOOTSTRAP_SECRET` in en maak je passkey aan. Daarna is deze route voorgoed gesloten.
@@ -159,8 +161,25 @@ Open de webapp. Omdat er nog geen gebruikers zijn, verschijnt **Eerste keer inst
 
 Wil je op een tweede apparaat inloggen? **Instellingen → Passkey voor dit apparaat** (of gebruik de QR-code die de browser aanbiedt om met je telefoon in te loggen).
 
-### Automatisch publiceren van de API via GitHub (optioneel)
-Voeg in de repository onder **Settings → Secrets and variables → Actions** toe: `CLOUDFLARE_API_TOKEN` (met rechten *Workers Scripts: Edit*, *D1: Edit*, *R2: Edit*) en `CLOUDFLARE_ACCOUNT_ID`. De workflow *API naar Cloudflare Workers* publiceert dan bij elke wijziging in `api/`.
+### Gecontroleerd publiceren via GitHub
+
+Voeg onder **Settings → Secrets and variables → Actions → Repository secrets** toe: `CLOUDFLARE_API_TOKEN` (met passende rechten voor de Worker, D1 en R2 in het bedoelde account) en `CLOUDFLARE_ACCOUNT_ID`. Deel waarden niet in chat, broncode of logs. Dit zijn andere instellingen dan de Worker-secrets zoals `SESSION_SECRET`.
+
+`.github/workflows/checks.yml` draait op branches en pull requests bij wijzigingen aan API, webapp of workflows: Node 24, `npm ci`, de tests en een lokale Worker-bundeling (`npm run check:worker`). Hiervoor zijn geen productiesecrets nodig.
+
+`.github/workflows/cloudflare-readiness.yml` is een afzonderlijke, **niet-publicerende** toegangscontrole. Deze draait wanneer dit workflowbestand op een werkbranch wordt gepusht, en is handmatig te starten zodra het op de standaardbranch staat. Na dezelfde lokale controles gebruikt hij de twee Actions-secrets om de status van het Cloudflare-gebruikerstoken en Worker-/D1-/R2-metadata te lezen. Hij wijzigt niets en bewijst geen schrijfrechten of geslaagde deployment. Gewone branch- en PR-controles blijven zonder productiesecrets draaien.
+
+`.github/workflows/deploy.yml` (*Wijnkelder publiceren*) draait bij relevante pushes naar `main` of een handmatige start op `main`:
+
+1. Bepaal wijzigingen sinds de laatste geslaagde gezamenlijke release en voer dezelfde controles uit.
+2. Publiceer de API als `api/` is gewijzigd. Ontbrekende Cloudflare-secrets blokkeren deze stap.
+3. Publiceer Pages als `web/` is gewijzigd, maar pas nadat een vereiste API-publicatie is geslaagd. Een bewust overgeslagen API-stap is toegestaan bij een web-only release.
+
+De **eerste release**, een handmatige start en wijzigingen aan workflows publiceren beide onderdelen. Daardoor blokkeren ontbrekende Cloudflare-secrets ook de eerste websitepublicatie. Bij latere web-only releases vanaf een geslaagde release zijn ze niet nodig. Na een mislukte of geannuleerde release worden conservatief beide onderdelen gepubliceerd: de API kan immers al zijn bijgewerkt voordat Pages faalde, zelfs als een volgende commit die wijziging terugdraait. Overgeslagen wachtrijcommits zonder eigen run tellen mee in de vergelijking met de laatste geslaagde release.
+
+Releases lopen na elkaar zonder een lopende release automatisch af te breken. Een run die bij de selectie niet meer de actuele `main` vertegenwoordigt, wordt geweigerd. Is een oude basiscommit niet meer beschikbaar, dan faalt de selectie; een bewuste handmatige release op de actuele `main` publiceert beide onderdelen zonder die vergelijking.
+
+Dit is **geen atomaire release**: als de API slaagt maar Pages faalt, draait de nieuwe API met de oude website. API-wijzigingen moeten dus achterwaarts compatibel blijven. Migraties worden nooit automatisch uitgevoerd. Verplichte PR-controles/branch protection zijn een afzonderlijke repository-instelling; deze workflows stellen ze niet zelf in.
 
 ## Kosten
 - GitHub Pages: gratis.
@@ -169,12 +188,21 @@ Voeg in de repository onder **Settings → Secrets and variables → Actions** t
 - Brave Search API: gratis tier (2.000 zoekopdrachten/maand) — alleen nodig als je prijsindicaties op echte webresultaten wilt baseren.
 
 ## Bijwerken van een bestaande installatie
-Nieuwe versies vervangen alleen code; jullie wijnen, gebruikers en foto's blijven staan. Wanneer een update een **databasemigratie** meebrengt (staat in `api/migrations/`), voer die dan één keer uit — migraties voegen alleen toe en verwijderen niets:
-```bash
-cd api
-npx wrangler d1 execute wijnkelder --remote --file=./migrations/0005_sommelier_chat.sql -y
-npm run deploy
-```
+Ontwikkelen op een werkbranch publiceert niets. Pas een relevante push/merge naar `main` of een bewuste handmatige release start de publicatieroute. Zolang repository, Pages-instellingen, Worker-naam en configuratie gelijk blijven, blijft het adres `https://tj-strataig.github.io/wijnkelder/` hetzelfde.
+
+Bewaar alle installatiegebonden waarden in `api/wrangler.toml` en heel `web/config.js`; neem deze bestanden niet automatisch over uit een zip of andere sessie. Het TOML-bestand moet UTF-8 **zonder BOM** blijven, ook bij opslaan vanuit Windows PowerShell.
+
+Codepublicatie wist de database en foto's niet, maar dat bewijst niet dat elke wijziging veilig is. Controleer bij een **databasemigratie** in `api/migrations/` eerst welke wijzigingen al zijn toegepast en maak een herstelplan. Sommige migraties kunnen niet tweemaal worden uitgevoerd. Voer alleen de ontbrekende migraties uit na afzonderlijke toestemming en een bewuste keuze over de releasevolgorde.
+
+### Back-up en herstel
+
+De JSON-export bevat collectiegegevens, maar niet de volledige database, passkeys/sessies, instellingen, gesprekken of fotobestanden. Voor volledig herstel zijn afzonderlijke, samenhangende back-ups van **D1**, de **R2-foto's** en veilig beheerde **configuratie en geheimen** nodig. Zonder de oorspronkelijke `SESSION_SECRET` zijn daarmee versleutelde instellingen niet leesbaar. Bewaar zulke back-ups niet in de repository.
+
+Een beschikbare herstelperiode of geslaagde export is nog geen bewezen volledige restore. Verifieer herstel apart in een geisoleerde omgeving; test nooit door productie te overschrijven. Een bereikbaar `/api/health` bevestigt niet dat deze onderdelen in orde zijn.
+
+Stand 17 september 2026: Cloudflare-toegang werkt en beide Actions repository-secrets zijn aanwezig; hun deployrechten zijn nog niet bevestigd. De live API-versie dateert van 11 september, zonder bevestigde koppeling aan een Git-commit. De verwachte 20 tabellen, 219 kolommen en 11 expliciete indexen zijn aanwezig. D1 Time Travel levert ook een herstelpunt van de vorige dag.
+
+Een afgeschermde lokale back-up bevat de D1-export, alle 59 R2-objecten met metadata en SHA-256, en de installatieconfiguratie. De export is hersteld in een aparte lokale SQLite-database: integriteit en relaties zijn in orde en alle 58 unieke fotoreferenties zijn aanwezig. Dit is geen volledige Cloudflare-/browserherstelproef of atomaire D1/R2-snapshot. De oorspronkelijke Worker-geheimen zijn niet opgenomen en hun veilige bewaring is nog onbevestigd; er is ook nog geen versleutelde kopie op een ander apparaat. Laat bestaande Worker-geheimen staan: vooral het vervangen van `SESSION_SECRET` maakt eerder versleutelde instellingen onleesbaar.
 
 ### Pushmeldingen inschakelen (optioneel)
 Meldingen verschijnen altijd in de app (🔔). Voor échte pushmeldingen op de telefoon heeft de server eenmalig een sleutelpaar nodig:
@@ -190,17 +218,19 @@ Daarna in de app: *Instellingen → Meldingen → Pushmeldingen inschakelen* (op
 
 ## Tests
 ```bash
-cd api && npm test
+cd api
+npm ci
+npm test
+npm run check:worker
 ```
-Draait 40 beveiligings- en functietests tegen de API (in-memory database, geen Cloudflare nodig). Zie [SECURITY.md](SECURITY.md) voor de reviewresultaten.
+Draait 55 tests voor API-gedrag, beveiligingsregels, releaseselectie en projectintegriteit (in-memory database, geen Cloudflare nodig). De Worker-check bundelt lokaal en publiceert niets. Node 24 is vereist.
+
+Alleen `registration.test.mjs` simuleert succesvolle WebAuthn-verificatie via Node-modulemocking om bootstrap- en uitnodigingsgedrag te controleren. `security.test.mjs` gebruikt de echte verifier en controleert onder meer dat een fake registratie wordt geweigerd. Deze tests vervangen geen passkeyproef in een echte browser/op een apparaat en bewijzen geen werkende live publicatie. Zie [SECURITY.md](SECURITY.md) voor de afbakening.
 
 ## Lokaal ontwikkelen
-```bash
-cd api && cp .dev.vars.example .dev.vars   # vul de geheimen in
-npm run db:init:local && npm run dev       # API op http://localhost:8787
-```
-Zet in `web/config.js` tijdelijk `API_BASE = 'http://localhost:8787'` en in `wrangler.toml` `ORIGIN = "http://localhost:5500"`, `RP_ID = "localhost"`; serveer `web/` bijv. met `npx serve web -l 5500`.
-Passkeys werken op `localhost` zonder https.
+Gebruik voor gewone codewijzigingen eerst de bovenstaande offline controles. Daarvoor zijn geen echte geheimen, Cloudflare-login of wijzigingen aan productieconfiguratie nodig.
+
+Interactief lokaal inloggen vereist een aparte lokale testconfiguratie: testdatabase, lokale API en website, passende CORS/CSP-instellingen en `localhost` als RP ID. Gebruik daarvoor afzonderlijke, niet-gecommitteerde configuratie en uitsluitend testgeheimen in `.dev.vars`. Wijzig niet tijdelijk de installatiebestanden die later naar productie gaan. Passkeys werken op `localhost` zonder https; het alleen starten van de API is geen volledige lokale appomgeving.
 
 ## Mappenstructuur
 ```
