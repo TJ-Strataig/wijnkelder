@@ -49,6 +49,29 @@ Dit document beschrijft hoe de app is beveiligd en welke keuzes daarbij zijn gem
 ## Geheimen en configuratie
 - Zet geheimen **nooit** in `wrangler.toml` of in de code; gebruik `wrangler secret put`. Voor lokaal testen: `.dev.vars` (staat in `.gitignore`).
 - `SESSION_SECRET` moet minimaal 32 willekeurige tekens zijn, bijv. `openssl rand -base64 48`.
+- Bewaar de installatiegebonden configuratie; kopieer `api/wrangler.toml` en `web/config.js` niet uit een andere installatie. TOML wordt zonder UTF-8-BOM opgeslagen.
+
+## Ontwikkel- en publicatiecontroles
+
+De huidige testset gebruikt Node 24 en `npm ci` met de bestaande lockfile. De 55 tests bestrijken API-regels, releaseselectie en projectintegriteit. Succesvolle registraties worden alleen in het afzonderlijke `registration.test.mjs` gesimuleerd via een modulemock van de WebAuthn-verifier; daarbij worden challenge, origin, RP ID en vereiste gebruikersverificatie gecontroleerd. De beveiligingstests gebruiken de echte verifier en bewaken dat ongeldige registraties geen gebruiker, credential of sessie aanmaken. Productieauthenticatie is hiervoor niet aangepast.
+
+Dit is geen nieuwe volledige beveiligingsreview of biometrische end-to-endproef. De historische reviewbeschrijvingen hieronder zijn geen bewijs van de huidige live versie. Echte apparaatregistratie, de GitHub-publicatieroute en herstel van productiegegevens vereisen afzonderlijke bevestiging.
+
+Branches en pull requests draaien controles zonder productiesecrets, inclusief een lokale Worker-dry-run. Alleen de releaseworkflow op `main` kan publiceren: controles, zo nodig API, daarna zo nodig Pages. Een mislukte of geannuleerde vereiste API-stap blokkeert Pages. De API gebruikt de vastgelegde Wrangler en vereist `CLOUDFLARE_API_TOKEN` en `CLOUDFLARE_ACCOUNT_ID` als Actions repository-secrets; ontbrekende waarden geven een fout, geen terugval naar een andere versie of publicatieroute.
+
+Releases worden geserialiseerd, maar zijn niet atomair. Een nieuwe API moet met de vorige webapp blijven werken. Na een mislukte of geannuleerde release publiceert de volgende release daarom beide onderdelen opnieuw. Migraties en repository-beveiliging zoals branch protection worden niet automatisch ingesteld of uitgevoerd.
+
+## Back-ups en herstel
+
+*Instellingen → Download JSON* is een collectie-export, **geen volledige herstelback-up**. Voor herstel zijn ook de volledige D1-database, private R2-objecten, installatieconfiguratie en veilig bewaarde Worker-geheimen nodig. De oorspronkelijke `SESSION_SECRET` is nodig voor het ontsleutelen van opgeslagen AI-instellingen. Bewaar back-ups en geheimen buiten GitHub en behandel ze als gevoelige gegevens.
+
+Controleer bewaartermijnen en herstelmogelijkheden apart en oefen herstel uitsluitend in een geisoleerde omgeving. Op 17 september 2026 zijn Cloudflare-toegang, de aanwezigheid van beide Actions repository-secrets en de verwachte live tabel-/kolom-/indexstructuur bevestigd. Inmiddels is ook publicatie en verwijdering van een geisoleerde tijdelijke Worker met de Actions-secrets bevestigd (run `35319619418`). Dit bewijst geen volledige productierelease, D1/R2-schrijfhandelingen of Pages-publicatie. De koppeling tussen de live Worker-versie en een Git-commit is nog niet bewezen.
+
+De D1-export en alle 59 R2-objecten zijn lokaal opgeslagen met beperkte Windows-toegangsrechten, metadata en hashes. Herstel naar een afzonderlijke lokale SQLite-database slaagt zonder integriteits- of foreign-keyfouten; alle 58 unieke fotoreferenties zijn aanwezig. Er is geen herstel op Cloudflare of volledige passkey-/browserproef uitgevoerd. D1 en R2 vormen geen gezamenlijk atomair snapshot. Een AES-256-versleuteld 7-Zip-archief met versleutelde bestandsnamen is lokaal op integriteit gecontroleerd en met gelijke SHA-256 naar persoonlijke OneDrive gekopieerd. De gebruiker bevestigt de online aanwezigheid en afzonderlijke veilige wachtwoordbewaring. Een onafhankelijke downloadcontrole is niet uitgevoerd; de lokale bronbestanden blijven onversleuteld onder beperkte Windows-toegangsrechten.
+
+De oorspronkelijke `SESSION_SECRET` en `BOOTSTRAP_SECRET` zijn niet in deze back-up opgenomen; de gebruiker heeft geen bevestigde veilige kopie. Cloudflare toont bestaande secretwaarden niet opnieuw via de beheer-API. Vervang `SESSION_SECRET` niet om dit op te lossen: daarmee zijn eerder versleutelde AI-instellingen niet meer te ontsleutelen. Bewaar een eventueel teruggevonden oorspronkelijke waarde rechtstreeks in een wachtwoordmanager, nooit in chat of GitHub. De huidige codepublicatie hoeft bestaande Worker-geheimen niet te vervangen.
+
+Als het oorspronkelijke geheim bij een volledige herinstallatie niet beschikbaar is, kan een beheerder een AI-aanbiedersleutel opnieuw invoeren onder een nieuw geheim in de herstelomgeving. Deze beperkte route is op 18 september lokaal beproefd op een geheugenkopie van de echte back-up, met synthetische sleutel/testsessies en zonder netwerkverkeer. Dit herstelt niet de oude versleuteling en bewijst geen echte browser-/passkeylogin of Cloudflare-restore. Zie de noodherstelprocedure in README; verander de huidige productiegeheimen niet.
 
 ## Beveiligingsreview (september 2026)
 De volledige code (API, webapp, installatiescripts, workflows) is onderworpen aan een onafhankelijke beveiligingsreview plus een geautomatiseerde testset (`cd api && npm test`, 18 tests). Er zijn geen kritieke of hoge bevindingen gevonden. De volgende punten (1× medium, 4× laag) zijn gevonden en verholpen:
@@ -97,4 +120,4 @@ Opnieuw gecontroleerd en in orde bevonden: router/autorisatie, WebAuthn-flow, SQ
 - Zet in `web/index.html` bij `connect-src` en `img-src` alleen het adres van jullie Worker in plaats van `https:`.
 - Koppel de Worker aan een eigen (sub)domein; dan kun je desgewenst overstappen op `HttpOnly`-cookies.
 - Schakel in Cloudflare **WAF/Bot Fight Mode** in en overweeg Cloudflare Access als extra laag vóór de API.
-- Maak periodiek een back-up via *Instellingen → Download JSON*.
+- Maak periodiek een collectie-export via *Instellingen → Download JSON* en richt daarnaast de volledige back-up- en herstelprocedure hierboven in.

@@ -1,4 +1,4 @@
-﻿# Cloudflare Worker configuratie voor de Wijnkelder-API.
+# Cloudflare Worker configuratie voor de Wijnkelder-API.
 # Pas de waarden onder [vars] aan naar jouw GitHub Pages-adres.
 
 name = "wijnkelder-api"

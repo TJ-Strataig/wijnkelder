@@ -31,7 +31,7 @@ function Set-Toml($path, $key, $value) {
   $line = "$key = `"$value`""
   $rx = [regex]$pattern
   if ($rx.IsMatch($s)) { $s = $rx.Replace($s, $line, 1) } else { $s += "`n$line`n" }
-  Set-Content $path $s -NoNewline -Encoding UTF8
+  [System.IO.File]::WriteAllText((Join-Path (Get-Location) $path), $s, (New-Object System.Text.UTF8Encoding($false)))
 }
 
 function Random-Token($bytes) {
@@ -45,9 +45,9 @@ Bold "Wijnkelder - installatie"; ""
 # -----------------------------------------------------------------------------
 Bold "1/8 Benodigde programma's"
 if (-not (Has git))  { Die "git ontbreekt. Installeer via https://git-scm.com of 'winget install Git.Git'." }
-if (-not (Has node)) { Die "Node.js ontbreekt. Installeer Node 20+ via https://nodejs.org of 'winget install OpenJS.NodeJS.LTS'." }
+if (-not (Has node)) { Die "Node.js ontbreekt. Installeer Node 24+ via https://nodejs.org of 'winget install OpenJS.NodeJS.LTS'." }
 $nodeMajor = [int]((node -v).TrimStart('v').Split('.')[0])
-if ($nodeMajor -lt 18) { Die "Node.js $nodeMajor is te oud; 20 of hoger is nodig." }
+if ($nodeMajor -lt 24) { Die "Node.js $nodeMajor is te oud; 24 of hoger is nodig." }
 Ok "git, node $(node -v)"
 
 if (-not (Has gh)) {
@@ -58,8 +58,8 @@ if (-not (Has gh)) {
 Ok "GitHub CLI $((gh --version | Select-Object -First 1) -replace 'gh version ','')"
 
 Info "Node-pakketten voor de API installeren..."
-Push-Location api; npm install --silent --no-fund --no-audit | Out-Null; $npmOk = ($LASTEXITCODE -eq 0); Pop-Location
-if (-not $npmOk) { Die "npm install is mislukt. Controleer je internetverbinding en probeer opnieuw." }
+Push-Location api; npm ci --silent --no-fund --no-audit | Out-Null; $npmOk = ($LASTEXITCODE -eq 0); Pop-Location
+if (-not $npmOk) { Die "npm ci is mislukt. Controleer je internetverbinding en of api/package-lock.json aanwezig is." }
 Ok "wrangler geinstalleerd"
 
 # -----------------------------------------------------------------------------
@@ -226,8 +226,11 @@ if ($vis -eq 'PRIVATE') {
   else { Warn "Repository blijft prive; GitHub Pages werkt dan alleen met GitHub Pro." }
 }
 
-# Vaste pakketversies vastleggen (lockfile) zodat de deploy-workflow met 'npm ci' werkt en niet ongemerkt nieuwe versies binnenhaalt.
-if (-not (Test-Path 'api/package-lock.json')) { Push-Location api; npm install --package-lock-only --silent --no-fund --no-audit 2>&1 | Out-Null; Pop-Location }
+$secretNames = @(gh secret list --repo "$GhUser/$RepoName" --json name --jq '.[].name')
+if ($LASTEXITCODE -ne 0) { Die "Kon de Actions-secretnamen niet controleren." }
+if ($secretNames -notcontains 'CLOUDFLARE_API_TOKEN' -or $secretNames -notcontains 'CLOUDFLARE_ACCOUNT_ID') {
+  Die "Stel eerst CLOUDFLARE_API_TOKEN en CLOUDFLARE_ACCOUNT_ID veilig in onder GitHub Settings > Secrets and variables > Actions (zie README). Start daarna het script opnieuw. Er is nog niet gepusht."
+}
 git add -A
 git -c user.name="Wijnkelder setup" -c user.email="setup@wijnkelder.local" commit -qm "Wijnkelder: installatie en configuratie" 2>$null | Out-Null
 git push -qu origin main
@@ -239,11 +242,12 @@ if ($LASTEXITCODE -ne 0) { gh api -X PUT "repos/$GhUser/$RepoName/pages" -f buil
 Ok "GitHub Pages ingesteld op GitHub Actions"
 Info "Workflow (opnieuw) starten zodat de webapp gepubliceerd wordt..."
 Start-Sleep -Seconds 3
-gh workflow run "Webapp naar GitHub Pages" --repo "$GhUser/$RepoName" 2>$null | Out-Null
+gh workflow run deploy.yml --ref main --repo "$GhUser/$RepoName" | Out-Null
+if ($LASTEXITCODE -ne 0) { Die "Kon de publicatieworkflow niet starten. Controleer GitHub Actions." }
 
-Info "Wachten tot de Pages-workflow klaar is (ca. 1 minuut)..."
+Info "Wachten tot de controles, API- en Pages-publicatie klaar zijn..."
 Start-Sleep -Seconds 8
-$runId = gh run list --repo "$GhUser/$RepoName" --workflow 'Webapp naar GitHub Pages' --limit 1 --json databaseId -q '.[0].databaseId' 2>$null
+$runId = gh run list --repo "$GhUser/$RepoName" --workflow deploy.yml --limit 1 --json databaseId -q '.[0].databaseId' 2>$null
 if ($runId) { gh run watch --exit-status --repo "$GhUser/$RepoName" $runId 2>$null | Out-Null }
 if ($LASTEXITCODE -eq 0 -and $runId) { Ok "Webapp gepubliceerd" } else { Warn "Kon de workflow niet volgen; controleer op https://github.com/$GhUser/$RepoName/actions" }
 

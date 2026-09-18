@@ -40,10 +40,10 @@ echo
 # -----------------------------------------------------------------------------
 bold "1/8 Benodigde programma's"
 command -v git  >/dev/null || die "git ontbreekt. Installeer git en draai het script opnieuw."
-command -v node >/dev/null || die "Node.js ontbreekt. Installeer Node 20+ via https://nodejs.org en draai het script opnieuw."
+command -v node >/dev/null || die "Node.js ontbreekt. Installeer Node 24+ via https://nodejs.org en draai het script opnieuw."
 command -v python3 >/dev/null || die "python3 ontbreekt (wordt gebruikt om configuratiebestanden aan te passen)."
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-[ "$NODE_MAJOR" -ge 18 ] || die "Node.js $NODE_MAJOR is te oud; 20 of hoger is nodig."
+[ "$NODE_MAJOR" -ge 24 ] || die "Node.js $NODE_MAJOR is te oud; 24 of hoger is nodig."
 ok "git, node $(node -v), python3"
 
 if ! command -v gh >/dev/null; then
@@ -57,7 +57,7 @@ fi
 ok "GitHub CLI $(gh --version | head -1 | awk '{print $3}')"
 
 info "Node-pakketten voor de API installeren…"
-(cd api && npm install --silent --no-fund --no-audit)
+(cd api && npm ci --silent --no-fund --no-audit)
 WRANGLER="npx --yes wrangler"
 ok "wrangler $(cd api && $WRANGLER --version 2>/dev/null | tail -1)"
 
@@ -200,8 +200,12 @@ if [ "$VIS" = "PRIVATE" ]; then
   case "${ANTW:-J}" in [JjYy]*) gh repo edit "${GH_USER}/${REPO_NAME}" --visibility public --accept-visibility-change-consequences >/dev/null 2>&1 && ok "Repository is nu openbaar";; *) warn "Blijft privé; Pages werkt dan alleen met GitHub Pro.";; esac
 fi
 
-# Vaste pakketversies vastleggen (lockfile) zodat de deploy-workflow met 'npm ci' werkt en niet ongemerkt nieuwe versies binnenhaalt.
-[ -f api/package-lock.json ] || (cd api && npm install --package-lock-only --silent --no-fund --no-audit >/dev/null 2>&1 || true)
+SECRET_NAMES="$(gh secret list --repo "${GH_USER}/${REPO_NAME}" --json name --jq '.[].name')" \
+  || die "Kon de Actions-secretnamen niet controleren."
+for REQUIRED_SECRET in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+  printf '%s\n' "$SECRET_NAMES" | grep -qx "$REQUIRED_SECRET" \
+    || die "Stel eerst CLOUDFLARE_API_TOKEN en CLOUDFLARE_ACCOUNT_ID veilig in onder GitHub Settings > Secrets and variables > Actions (zie README). Start daarna het script opnieuw. Er is nog niet gepusht."
+done
 git add -A
 git -c user.name="${GIT_AUTHOR_NAME:-Wijnkelder setup}" -c user.email="${GIT_AUTHOR_EMAIL:-setup@wijnkelder.local}" \
   commit -qm "Wijnkelder: installatie en configuratie" >/dev/null 2>&1 || true
@@ -213,11 +217,12 @@ gh api -X POST "repos/${GH_USER}/${REPO_NAME}/pages" -f build_type=workflow >/de
   || gh api -X PUT "repos/${GH_USER}/${REPO_NAME}/pages" -f build_type=workflow >/dev/null 2>&1 || true
 ok "GitHub Pages ingesteld op GitHub Actions"
 info "Workflow (opnieuw) starten zodat de webapp gepubliceerd wordt…"
-sleep 3; gh workflow run "Webapp naar GitHub Pages" --repo "${GH_USER}/${REPO_NAME}" >/dev/null 2>&1 || true
+sleep 3; gh workflow run deploy.yml --ref main --repo "${GH_USER}/${REPO_NAME}" \
+  || die "Kon de publicatieworkflow niet starten. Controleer GitHub Actions."
 
-info "Wachten tot de Pages-workflow klaar is (±1 minuut)…"
+info "Wachten tot de controles, API- en Pages-publicatie klaar zijn…"
 sleep 8
-gh run watch --exit-status --repo "${GH_USER}/${REPO_NAME}" "$(gh run list --repo "${GH_USER}/${REPO_NAME}" --workflow 'Webapp naar GitHub Pages' --limit 1 --json databaseId -q '.[0].databaseId')" >/dev/null 2>&1 \
+gh run watch --exit-status --repo "${GH_USER}/${REPO_NAME}" "$(gh run list --repo "${GH_USER}/${REPO_NAME}" --workflow deploy.yml --limit 1 --json databaseId -q '.[0].databaseId')" >/dev/null 2>&1 \
   && ok "Webapp gepubliceerd" || warn "Kon de workflow niet volgen; controleer op https://github.com/${GH_USER}/${REPO_NAME}/actions"
 
 # -----------------------------------------------------------------------------
