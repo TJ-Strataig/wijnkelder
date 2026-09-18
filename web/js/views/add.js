@@ -4,14 +4,24 @@ import { api, photoUrl } from '../api.js';
 import { loadWines, invalidateWines } from '../data.js';
 import { bottleForm, destinationForm, duplicateDialog } from './wine.js';
 import { scanBarcode } from '../barcode.js';
+import { renderTabs } from '../tabs.js';
+import { render as renderBulk } from './bulk.js';
 
-export async function render(main, { params, mode, navigate }) {
+export async function render(main, context) {
+  if (context.mode === 'edit') return singleView(main, context);
+  main.append(el('h1', { text: 'Toevoegen' }));
+  return renderTabs(main, { path: '/toevoegen', query: context.query, tabs: [
+    { key: 'single', label: 'Eén wijn', render: (body) => singleView(body, context) },
+    { key: 'bulk', label: 'Bulk', render: (body) => renderBulk(body, context) },
+  ] });
+}
+
+async function singleView(main, { params, mode, navigate }) {
   const editing = mode === 'edit';
   let existing = null;
   if (editing) existing = (await api.get(`/api/wines/${params[0]}`)).wine;
 
-  main.append(el('div', { class: 'row between' }, el('h1', { text: editing ? `Bewerken — ${existing.name}` : 'Wijn toevoegen' }),
-    editing ? null : el('a', { class: 'btn ghost sm', href: '#/bulk', text: '📷 Meerdere flessen tegelijk' })));
+  if (editing) main.append(el('h1', { text: `Bewerken — ${existing.name}` }));
   const wrap = el('div', { class: 'stack' });
   main.append(wrap);
 

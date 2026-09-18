@@ -3,7 +3,7 @@ import { el, clear, field, input, select, modal, confirmDialog, toast, fmtDate, 
 import { api, session } from '../api.js';
 
 export async function render(main) {
-  main.append(el('h1', { text: 'Beheer van het huishouden' }), el('p', { class: 'muted', text: 'Alleen beheerders kunnen leden toevoegen. Een nieuw lid krijgt een uitnodigingslink (48 uur geldig, eenmalig te gebruiken) en maakt daarmee een eigen passkey aan.' }));
+  main.append(el('h2', { text: 'Beheer van het huishouden' }), el('p', { class: 'muted', text: 'Alleen beheerders kunnen leden toevoegen. Een nieuw lid krijgt een uitnodigingslink (48 uur geldig, eenmalig te gebruiken) en maakt daarmee een eigen passkey aan.' }));
   const root = el('div', { class: 'stack' });
   main.append(root);
 
@@ -44,7 +44,7 @@ export async function render(main) {
     }
     root.append(iCard);
   }
-  load();
+  await load();
 }
 
 function inviteDialog(reload) {

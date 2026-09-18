@@ -6,6 +6,7 @@ import { el, clear, field, input, select, checkbox, toast, confirmDialog, TYPE_L
 import { api, photoUrl } from '../api.js';
 import { loadWines, invalidateWines } from '../data.js';
 import { destinationForm, duplicateDialog } from './wine.js';
+import { renderTabs } from '../tabs.js';
 
 const STATUS_LABEL = { wachten: 'In de wachtrij', herkennen: 'Herkennen…', uploaden: 'Opslaan in wachtrij…', controleren: 'Controleren', fout: 'Herkenning mislukt', goedgekeurd: 'Toegevoegd', overgeslagen: 'Overgeslagen', opgeslagen: 'In wachtrij voor later' };
 const STATUS_CLASS = { wachten: '', herkennen: 'warn', uploaden: 'warn', controleren: 'gold', fout: 'bad', goedgekeurd: 'ok', overgeslagen: '', opgeslagen: 'ok' };
@@ -79,27 +80,19 @@ async function recognizeDataUrl(dataUrl) {
 }
 
 export async function render(main, { query }) {
-  main.append(el('h1', { text: 'Bulk toevoegen' }));
-  const tabs = el('div', { class: 'tabs' });
-  const body = el('div');
-  main.append(tabs, body);
   let existing = [];
   try { existing = await loadWines(); } catch { /* niet kritisch */ }
   main.append(el('datalist', { id: 'locaties' }, [...new Set(existing.flatMap((w) => (w.locations || '').split(',')).filter(Boolean))].map((v) => el('option', { value: v }))));
 
   const queueCount = el('span', { class: 'badge gold', hidden: true, style: { marginLeft: '0.4rem' } });
-  let mode = query.get('tab') === 'queue' ? 'queue' : 'upload';
-  for (const [key, label] of [['upload', '📷 Foto\'s toevoegen'], ['queue', '🗂️ Beoordelen']]) {
-    const b = el('button', { type: 'button', class: key === mode ? 'active' : '' }, label, key === 'queue' ? queueCount : null);
-    b.addEventListener('click', () => { mode = key; tabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b)); show(); });
-    tabs.append(b);
-  }
   async function refreshCount() {
     try { const q = await api.get('/api/intake'); const n = q.counts.recognized + q.counts.pending + q.counts.failed; queueCount.textContent = String(n); queueCount.hidden = !n; } catch { /* stil */ }
   }
   refreshCount();
-  function show() { clear(body); (mode === 'upload' ? uploadView : queueView)(body, existing, { refreshCount }); }
-  show();
+  return renderTabs(main, { path: '/toevoegen', query, param: 'bulkTab', tabs: [
+    { key: 'upload', label: '📷 Foto\'s toevoegen', render: (body) => uploadView(body, existing, { refreshCount }) },
+    { key: 'queue', label: ['🗂️ Beoordelen', queueCount], retain: false, render: (body) => queueView(body, existing, { refreshCount }) },
+  ] });
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +123,7 @@ function uploadView(body, existing, { refreshCount }) {
 
   const progressText = el('span', { class: 'muted small' });
   const startBtn = el('button', { class: 'btn gold sm', type: 'button', text: 'Herkenning starten', hidden: true });
-  const toQueueBtn = el('a', { class: 'btn ghost sm', href: '#/bulk?tab=queue', text: 'Naar de beoordelingswachtrij →', hidden: true });
+  const toQueueBtn = el('a', { class: 'btn ghost sm', href: '#/toevoegen?tab=bulk&bulkTab=queue', text: 'Naar de beoordelingswachtrij →', hidden: true });
   body.append(el('div', { class: 'row between', style: { margin: '1rem 0 0.5rem' } }, progressText, el('div', { class: 'row' }, toQueueBtn, startBtn)));
   const list = el('div', { class: 'stack' });
   body.append(list);

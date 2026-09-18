@@ -2,10 +2,23 @@
 import { el, clear, field, input, select, checkbox, modal, confirmDialog, toast, fmtDateTime, download } from '../util.js';
 import { api, session } from '../api.js';
 import { addPasskey, logout, deviceLabel } from '../auth.js';
+import { renderTabs } from '../tabs.js';
+import { render as renderAdmin } from './admin.js';
 
-export async function render(main, { navigate }) {
+export async function render(main, context) {
+  if (context.query.get('tab') === 'admin' && session.user?.role !== 'admin') {
+    toast('Alleen voor beheerders', 'error');
+    return context.navigate('/instellingen');
+  }
+  main.append(el('h1', { text: 'Instellingen' }));
+  const tabs = [{ key: 'personal', label: 'Persoonlijk & app', render: (body) => personalView(body, context) }];
+  if (session.user?.role === 'admin') tabs.push({ key: 'admin', label: 'Beheer', render: renderAdmin });
+  return renderTabs(main, { path: '/instellingen', query: context.query, tabs });
+}
+
+async function personalView(main, { navigate }) {
   const user = session.user;
-  main.append(el('h1', { text: 'Instellingen' }), el('p', { class: 'muted', text: `Ingelogd als ${user?.name} (${user?.role === 'admin' ? 'beheerder' : 'lid'})` }));
+  main.append(el('p', { class: 'muted', text: `Ingelogd als ${user?.name} (${user?.role === 'admin' ? 'beheerder' : 'lid'})` }));
 
   // Passkeys
   const pk = el('div', { class: 'card' });

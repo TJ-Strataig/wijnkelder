@@ -7,6 +7,7 @@ alle leden zien en beheren dezelfde collectie.
 ## Wat kan de app?
 
 **Collectie**
+- **Navigatie**: bulk-invoer en de beoordelingswachtrij staan onder **Toevoegen → Bulk**; statistieken onder **Inzichten → Statistieken**; huishoudbeheer onder **Instellingen → Beheer** (alleen voor beheerders). Oude links blijven naar de juiste onderdelen verwijzen.
 - **AI naar keuze**: onder *Instellingen → AI-sommelier* kiest de beheerder tussen **Anthropic (Claude Sonnet 4.5, Opus 4.1, Haiku 4.5, …)** en **OpenAI**, voert de API-sleutel in (versleuteld opgeslagen) en test de verbinding met één klik.
 - **Bulk toevoegen**: kies meerdere etiketfoto's tegelijk (van één of verschillende wijnhuizen) of fotografeer fles na fles. Gedeelde aankoopgegevens (datum, winkel, kelderlocatie) vul je één keer in; **aantal en prijs per fles** apart. De AI herkent de etiketten; jij controleert en keurt **elke fles apart goed** voordat hij in de kelder komt. Duplicaten worden herkend en als extra flessen bijgeboekt.
 - **Later beoordelen**: zet het vinkje aan en de foto's + herkenning gaan naar een **beoordelingswachtrij op de server**. Maak onderweg of in de winkel de foto's op je telefoon, en loop ze later op de desktop rustig door (bewaren, goedkeuren, overslaan). Alle huishoudleden zien dezelfde wachtrij, gegroepeerd per partij.
@@ -106,7 +107,7 @@ Voor Cloudflare vraagt het script om een **API-token** (op Windows werkt de brow
 Aan het einde toont het script het adres van de app en een **opstartwachtwoord** voor de eerste login. Daarna in de app:
 1. **Eerste keer instellen** → naam + opstartwachtwoord → passkey aanmaken.
 2. **Instellingen → AI-sommelier** → Anthropic (Claude) kiezen, model kiezen, API-sleutel van console.anthropic.com plakken → *Verbinding testen*.
-3. **Beheer → Lid uitnodigen** → link naar Angela sturen.
+3. **Instellingen → Beheer → Lid uitnodigen** → link naar Angela sturen.
 
 Het script slaat sommige bestaande resources over, maar voert ook configuratie-, database- en publicatiestappen uit. Herhaal het niet blind bij een bestaande installatie; controleer eerst de reeds uitgevoerde stappen.
 
@@ -157,7 +158,7 @@ Zet bij een **nieuwe installatie** in `web/config.js` het Worker-adres in `API_B
 Open de webapp. Omdat er nog geen gebruikers zijn, verschijnt **Eerste keer instellen**: vul je naam en het `BOOTSTRAP_SECRET` in en maak je passkey aan. Daarna is deze route voorgoed gesloten.
 
 ### 5. Huishoudleden toevoegen
-**Beheer → Lid uitnodigen** → naam en rol → je krijgt een link die 48 uur geldig is en één keer werkt. Stuur die persoonlijk door; de genodigde maakt ermee een eigen passkey aan.
+**Instellingen → Beheer → Lid uitnodigen** → naam en rol → je krijgt een link die 48 uur geldig is en één keer werkt. Stuur die persoonlijk door; de genodigde maakt ermee een eigen passkey aan.
 
 ### 6. AI-sommelier instellen (Claude of OpenAI)
 **Instellingen → AI-sommelier** (alleen beheerder): kies *Anthropic (Claude)*, kies een model (aanbevolen: Claude Sonnet 4.5) en plak je API-sleutel van console.anthropic.com. Klik **Opslaan** en daarna **Verbinding testen**. De sleutel wordt met AES-256-GCM versleuteld in de database bewaard en is daarna niet meer uit te lezen — ook niet door beheerders. Je kunt elk moment van model wisselen; alle leden gebruiken dezelfde instelling.
@@ -242,7 +243,7 @@ npm ci
 npm test
 npm run check:worker
 ```
-Draait 55 tests voor API-gedrag, beveiligingsregels, releaseselectie en projectintegriteit (in-memory database, geen Cloudflare nodig). De Worker-check bundelt lokaal en publiceert niets. Node 24 is vereist.
+Draait tests voor API-gedrag, beveiligingsregels, releaseselectie, projectintegriteit, Vanavond en de gegroepeerde navigatie (in-memory database en gesimuleerde DOM/API voor weergavetests, geen Cloudflare nodig). De Worker-check bundelt lokaal en publiceert niets. Node 24 is vereist.
 
 Alleen `registration.test.mjs` simuleert succesvolle WebAuthn-verificatie via Node-modulemocking om bootstrap- en uitnodigingsgedrag te controleren. `security.test.mjs` gebruikt de echte verifier en controleert onder meer dat een fake registratie wordt geweigerd. Deze tests vervangen geen passkeyproef in een echte browser/op een apparaat en bewijzen geen werkende live publicatie. Zie [SECURITY.md](SECURITY.md) voor de afbakening.
 
