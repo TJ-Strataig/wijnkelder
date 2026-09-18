@@ -1,36 +1,106 @@
 // "Wat drinken we vanavond?" en restaurant-modus (wijnkaart fotograferen).
-import { el, clear, field, input, toast, typeLabel, TYPE_ICONS, wineTitle, money, drinkStatus, shrinkImage, stars } from '../util.js';
-import { api, photoUrl } from '../api.js';
+import { el, clear, field, input, toast, typeLabel, TYPE_ICONS, wineTitle, money, drinkStatus, shrinkImage } from '../util.js';
+import { api } from '../api.js';
+import { loadWines } from '../data.js';
+import { DISHES, DISH_GROUPS } from '../pairings.js';
+import { renderDishMatches, renderPairingAdvice, renderByWine } from './pairing.js';
 
 const ROLE = { veilig: ['🎯', 'Veilige keuze', 'ok'], verrassing: ['🎲', 'Verrassing', 'gold'], 'nu-open': ['⏳', 'Nu openen', 'warn'] };
 
-export async function render(main, { query }) {
-  main.append(el('h1', { text: 'Vanavond' }));
+export async function render(main, { query = new URLSearchParams() } = {}) {
+  main.append(el('h1', { text: 'Vanavond' }), el('p', { class: 'muted', text: 'Spijs & wijn, een fles voor de avond of advies in het restaurant — alles op één plek.' }));
   const tabs = el('div', { class: 'tabs' });
   const body = el('div');
   main.append(tabs, body);
-  let mode = query.get('tab') === 'restaurant' ? 'restaurant' : 'home';
-  for (const [key, label] of [['home', '🏠 Thuis: wat drinken we?'], ['restaurant', '🍽️ Restaurant: wijnkaart lezen']]) {
+  let mode = ['wijn', 'restaurant'].includes(query.get('tab')) ? query.get('tab') : 'home';
+  const panels = new Map();
+  for (const [key, label] of [['home', '🏠 Gerecht & avondadvies'], ['wijn', '🍷 Wat eten we bij deze wijn?'], ['restaurant', '🍽️ Restaurant: wijnkaart lezen']]) {
     const b = el('button', { type: 'button', class: key === mode ? 'active' : '', text: label });
-    b.addEventListener('click', () => { mode = key; tabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b)); show(); });
+    b.setAttribute('aria-pressed', String(key === mode));
+    b.addEventListener('click', () => {
+      mode = key;
+      tabs.querySelectorAll('button').forEach((x) => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+      window.history.replaceState(null, '', key === 'home' ? '#/vanavond' : `#/vanavond?tab=${key}`);
+      show();
+    });
     tabs.append(b);
   }
-  function show() { clear(body); (mode === 'home' ? homeView : restaurantView)(body); }
+  function show() {
+    for (const [key, panel] of panels) panel.hidden = key !== mode;
+    if (panels.has(mode)) return;
+    const panel = el('div');
+    panels.set(mode, panel);
+    body.append(panel);
+    if (mode === 'home') homeView(panel);
+    else if (mode === 'restaurant') restaurantView(panel);
+    else wineView(panel);
+  }
   show();
 }
 
 function homeView(body) {
-  body.append(el('p', { class: 'muted small', text: 'Eén tik en de huissommelier kiest drie flessen uit jullie kelder: een veilige keuze, een verrassing en iets dat nu open moet. Hij kijkt naar de dag, het seizoen, wat jullie recent dronken, jullie scores en de drinkvensters.' }));
-  const dish = input({ placeholder: 'Wat eten we? (optioneel)', maxlength: 200 });
+  body.append(el('p', { class: 'muted small', text: 'Kies of typ een gerecht voor directe spijs-wijnmatches uit jullie kelder. De huissommelier combineert het gerecht en jullie stemming met scores, drinkvensters en wat jullie recent dronken: een veilige keuze, een verrassing en iets dat nu open moet. Ook zonder gerecht kun je avondadvies vragen.' }));
+  const dishSel = el('select', { 'aria-label': 'Kies een gerecht' }, el('option', { value: '', text: '— kies een gerecht (optioneel) —' }));
+  for (const group of DISH_GROUPS) {
+    dishSel.append(el('optgroup', { label: group }, DISHES.filter((d) => d.group === group).map((d) => el('option', { value: d.id, text: d.name }))));
+  }
+  const dish = input({ placeholder: 'Of typ je gerecht, bijv. lamsrack met rozemarijn', maxlength: 200 });
   const mood = input({ placeholder: 'Stemming of gezelschap, bijv. "rustige avond", "vrienden over" (optioneel)', maxlength: 100 });
   const btn = el('button', { class: 'btn gold', type: 'button', text: '🍷 Kies voor vanavond' });
-  body.append(el('div', { class: 'card' }, el('div', { class: 'form-grid' }, el('div', { class: 'full' }, dish), el('div', { class: 'full' }, mood)), el('div', { class: 'row', style: { marginTop: '0.5rem' } }, btn)));
-  const out = el('div');
-  body.append(out);
+  const pairBtn = el('button', { class: 'btn secondary', type: 'button', text: '✨ Uitgebreid wijnadvies bij gerecht', disabled: true });
+  body.append(el('div', { class: 'card' }, el('div', { class: 'form-grid' },
+    field('Gerecht uit de lijst', dishSel), field('Eigen gerecht', dish), field('Stemming of gezelschap', mood)),
+    el('div', { class: 'row', style: { marginTop: '0.5rem' } }, btn, pairBtn),
+    el('p', { class: 'muted small', text: 'Directe matches gebruiken vaste regels, zonder AI. Avondadvies neemt ook je stemming mee; uitgebreid wijnadvies richt zich op het gerecht. AI wordt alleen op verzoek gebruikt.' })));
+  const out = el('div', { 'aria-live': 'polite' });
+  const pairOut = el('div', { 'aria-live': 'polite' });
+  const matches = el('div', { 'aria-live': 'polite' });
+  body.append(out, pairOut, matches);
+  let wines = null;
+  let revision = 0;
+  let pairingBusy = false;
+  const dishText = () => dish.value.trim() || DISHES.find((d) => d.id === dishSel.value)?.name || '';
+  function updateMatches() {
+    pairBtn.disabled = !wines || !dishText() || pairingBusy;
+    if (wines) renderDishMatches(matches, wines, dishText(), dishSel.value);
+  }
+  function changed() { revision++; clear(out); clear(pairOut); updateMatches(); }
+  dishSel.addEventListener('change', () => { dish.value = ''; changed(); });
+  dish.addEventListener('input', () => { dishSel.value = ''; changed(); });
+  mood.addEventListener('input', changed);
+  async function loadMatches() {
+    clear(matches); matches.append(el('p', { class: 'muted small', text: 'Kelder laden voor spijs-wijnmatches…' }));
+    try {
+      wines = (await loadWines()).filter((w) => w.bottles_in_cellar > 0);
+      updateMatches();
+    } catch (e) {
+      clear(matches);
+      matches.append(el('p', { class: 'muted', text: `Spijs-wijnmatches konden niet worden geladen: ${e.message}` }),
+        el('button', { class: 'btn secondary sm', type: 'button', text: 'Kelder opnieuw laden', onClick: loadMatches }));
+    }
+  }
+  loadMatches();
+  pairBtn.addEventListener('click', async () => {
+    const text = dishText();
+    if (!text) return toast('Kies of typ eerst een gerecht', 'error');
+    if (!wines || pairingBusy) return;
+    const current = revision;
+    pairingBusy = true; updateMatches();
+    pairBtn.textContent = 'De sommelier denkt na…'; clear(pairOut);
+    try {
+      const result = el('div');
+      await renderPairingAdvice(result, wines, text);
+      if (current === revision) pairOut.append(result);
+    } catch (e) { toast(e.message, 'error'); }
+    finally { pairingBusy = false; pairBtn.textContent = '✨ Uitgebreid wijnadvies bij gerecht'; updateMatches(); }
+  });
   btn.addEventListener('click', async () => {
+    const current = revision;
     btn.disabled = true; btn.textContent = 'De sommelier kijkt in de kelder…'; clear(out);
     try {
-      const r = await api.post('/api/sommelier/tonight', { dish: dish.value || undefined, mood: mood.value || undefined });
+      const r = await api.post('/api/sommelier/tonight', { dish: dishText() || undefined, mood: mood.value.trim() || undefined });
+      if (current !== revision) return;
+      out.append(el('h2', { text: 'Advies voor vanavond' }));
       if (r.summary) out.append(el('p', { style: { fontFamily: 'var(--font-serif)', fontSize: '1.1rem' }, text: r.summary }));
       if (!r.picks.length) out.append(el('p', { class: 'muted', text: 'Geen suggestie gevonden — is de kelder leeg?' }));
       for (const p of r.picks) {
@@ -46,6 +116,21 @@ function homeView(body) {
       out.append(el('button', { class: 'btn ghost sm', type: 'button', text: '🔄 Andere suggesties', onClick: () => btn.click() }));
     } catch (e) { toast(e.message, 'error'); } finally { btn.disabled = false; btn.textContent = '🍷 Kies voor vanavond'; }
   });
+}
+
+async function wineView(body) {
+  clear(body);
+  body.append(el('p', { class: 'muted small', text: 'Kelder laden…' }));
+  try {
+    const wines = (await loadWines()).filter((w) => w.bottles_in_cellar > 0);
+    clear(body);
+    body.append(el('p', { class: 'muted', text: 'Kies een wijn uit jullie kelder en ontdek welke gerechten erbij passen.' }));
+    renderByWine(body, wines);
+  } catch (e) {
+    clear(body);
+    body.append(el('p', { class: 'muted', text: `Kelder kon niet worden geladen: ${e.message}` }),
+      el('button', { class: 'btn secondary sm', type: 'button', text: 'Opnieuw proberen', onClick: () => wineView(body) }));
+  }
 }
 
 function restaurantView(body) {

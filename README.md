@@ -26,10 +26,13 @@ alle leden zien en beheren dezelfde collectie.
 
 **Proefnotities** per wijn en per fles: score (50–100, met sterren), kleur, neus, smaak, afdronk, gelegenheid, gegeten met, opnieuw kopen ja/nee, vrije notities. Gemiddelde score per wijn en een "best beoordeeld"-lijst.
 
-**Spijs & wijn**
+**Vanavond: spijs & wijn**
+- Eén gedeeld formulier voor gerecht en stemming, met directe keldermatches en persoonlijk avondadvies. De eerdere link `#/spijs` opent nu `#/vanavond`.
 - Kies een gerecht (30 categorieën: van biefstuk en oesters tot rijsttafel, stamppot, geitenkaas en chocoladedessert) → passende wijnen **uit de eigen kelder** met match-percentage.
 - Andersom: kies een wijn → welke gerechten passen.
 - **AI-sommelier**: typ wat je gaat eten en krijg de beste 5 flessen uit de kelder met uitleg en serveertip, rekening houdend met drinkvensters. Op de wijnpagina kan de AI ook gerechten voorstellen.
+- **Avondadvies**: het gerecht en de stemming worden samen gebruikt voor drie flessen: een veilige keuze, een verrassing en iets dat nu open moet. Ook beschikbaar zonder gerecht. AI wordt alleen op verzoek aangeroepen; vaste spijs-wijnmatches niet.
+- Het tabblad **Wat eten we bij deze wijn?** en de **Restaurant**-wijnkaart staan op dezelfde pagina. Invoer en resultaten blijven behouden bij wisselen tussen deze tabbladen.
 
 **Herkomst & wijnhuizen**
 - **Topografische kaart** (OpenTopoMap, omschakelbaar naar stratenkaart) met een speld per wijn, gekleurd op type en met het aantal flessen. Spelden dicht bij elkaar worden gegroepeerd; tik om in te zoomen. Tik op een speld voor de wijnen op die plek en het wijnhuis.
@@ -40,7 +43,7 @@ alle leden zien en beheren dezelfde collectie.
 **De Sommelier (chat-agent)** — tabblad 🍷 in de onderbalk. Praat in gewone taal, stuur een foto of spreek je vraag in. De Sommelier heeft gereedschappen en handelt zelf: kelder doorzoeken, etiket herkennen (→ beoordelingswachtrij, pas in de kelder na jouw bevestiging), wijnkaart lezen, fles afboeken met proefnotitie, drie flessen voor vanavond kiezen, verlanglijst, drinkvensters. Onder elk antwoord staat wat hij deed. **Hij praat uitsluitend over wijn**: drie lagen bewaking (onderwerpcontrole vóór elk antwoord, strikte instructie, gereedschappen die alleen wijngegevens kunnen) weren andere onderwerpen, andere dranken en pogingen om zijn instructies te omzeilen; geweigerde vragen staan in het activiteitenlog.
 
 **Slimme functies**
-- **Vanavond** — één tik en de huissommelier kiest drie flessen uit de kelder: een veilige keuze, een verrassing en iets dat nu open moet. Rekening houdend met dag, seizoen, wat je recent dronk, jullie scores en drinkvensters.
+- **Vanavond** — combineert spijs-wijnmatches en avondadvies op één pagina, rekening houdend met dag, seizoen, wat je recent dronk, jullie scores en drinkvensters.
 - **Restaurant-modus** — fotografeer de wijnkaart; de sommelier markeert wat jullie kennen (met eigen score) en adviseert op basis van smaakprofiel, gerecht en budget.
 - **Sommelier-push** — wekelijkse tip voor het weekend, drinkvenster-meldingen (maandag) en voorraadtekorten (zaterdag), als pushmelding op de telefoon én in de 🔔-inbox in de app. Dag en tijd zelf instelbaar.
 - **Smaakprofielen** — per persoon: scores per type, druif, land, streek en body; waar Angela en Tije verschillen; gedeelde favorieten.

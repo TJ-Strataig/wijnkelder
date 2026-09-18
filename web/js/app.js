@@ -9,7 +9,6 @@ import * as cellar from './views/cellar.js';
 import * as wine from './views/wine.js';
 import * as add from './views/add.js';
 import * as history from './views/history.js';
-import * as pairing from './views/pairing.js';
 import * as stats from './views/stats.js';
 import * as wishlist from './views/wishlist.js';
 import * as admin from './views/admin.js';
@@ -43,7 +42,7 @@ const ROUTES = [
   { pattern: /^\/voorraad$/, view: manage },
   { pattern: /^\/wijn\/([^/]+)\/bewerken$/, view: add, mode: 'edit' },
   { pattern: /^\/historie$/, view: history },
-  { pattern: /^\/spijs$/, view: pairing },
+  { pattern: /^\/spijs$/, view: tonight },
   { pattern: /^\/statistieken$/, view: stats },
   { pattern: /^\/verlanglijst$/, view: wishlist },
   { pattern: /^\/beheer$/, view: admin, admin: true },
@@ -68,12 +67,12 @@ function renderNav(active) {
   const side = document.getElementById('sidenav');
   const bottom = document.getElementById('bottomnav');
   clear(side); clear(bottom);
-  const items = [...NAV.filter((n) => n.path !== '/meer'), { path: '/historie', label: 'Historie', ico: '📜' }, { path: '/spijs', label: 'Spijs & wijn', ico: '🍽️' }, { path: '/inzichten', label: 'Inzichten', ico: '👅' }, { path: '/voorraad', label: 'Voorraad', ico: '🛒' }, { path: '/bulk', label: 'Bulk', ico: '📷' }, { path: '/herkomst', label: 'Herkomst', ico: '🗺️' }, { path: '/wijnhuizen', label: 'Wijnhuizen', ico: '🏡' }, { path: '/statistieken', label: 'Statistieken', ico: '📊' }, { path: '/verlanglijst', label: 'Verlanglijst', ico: '📝' }];
+  const items = [...NAV.filter((n) => n.path !== '/meer'), { path: '/historie', label: 'Historie', ico: '📜' }, { path: '/inzichten', label: 'Inzichten', ico: '👅' }, { path: '/voorraad', label: 'Voorraad', ico: '🛒' }, { path: '/bulk', label: 'Bulk', ico: '📷' }, { path: '/herkomst', label: 'Herkomst', ico: '🗺️' }, { path: '/wijnhuizen', label: 'Wijnhuizen', ico: '🏡' }, { path: '/statistieken', label: 'Statistieken', ico: '📊' }, { path: '/verlanglijst', label: 'Verlanglijst', ico: '📝' }];
   if (user?.role === 'admin') items.push({ path: '/beheer', label: 'Beheer', ico: '👥' });
   items.push({ path: '/instellingen', label: 'Instellingen', ico: '⚙️' });
   for (const n of items) side.append(el('a', { href: `#${n.path}`, class: active === n.path ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));
   for (const n of NAV) {
-    const isActive = active === n.path || (n.path === '/meer' && ['/historie', '/spijs', '/inzichten', '/voorraad', '/bulk', '/herkomst', '/wijnhuizen', '/statistieken', '/verlanglijst', '/beheer', '/instellingen'].includes(active));
+    const isActive = active === n.path || (n.path === '/meer' && ['/historie', '/inzichten', '/voorraad', '/bulk', '/herkomst', '/wijnhuizen', '/statistieken', '/verlanglijst', '/beheer', '/instellingen'].includes(active));
     bottom.append(el('a', { href: `#${n.path}`, class: isActive ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));
   }
   document.getElementById('user-chip').textContent = user ? user.name : '';
@@ -85,7 +84,7 @@ function renderMore(main) {
   const links = [
     ['/historie', '📜', 'Historie', 'Gedronken flessen, proefnotities, activiteitenlog'],
     ['/sommelier', '🎩', 'De Sommelier', 'Chat: vraag, etiket of wijnkaart — alleen over wijn'],
-    ['/spijs', '🍽️', 'Spijs & wijn', 'Welke wijn bij welk gerecht — en andersom'],
+    ['/vanavond', '🥂', 'Vanavond: spijs & wijn', 'Gerecht, stemming en kelderwijnen — of kies eerst een wijn'],
     ['/inzichten', '👅', 'Inzichten', 'Smaakprofiel van Angela en Tije, prijs-kwaliteit, jaaroverzicht'],
     ['/voorraad', '🛒', 'Voorraad & beheer', 'Aankooplijst met budget, inventarisatie, cadeau-register'],
     ['/vanavond?tab=restaurant', '🍽️', 'Restaurant-modus', 'Wijnkaart fotograferen en advies krijgen'],
@@ -139,6 +138,7 @@ async function render() {
   if (!route.public && !loggedIn) return navigate('/login');
   if (route.public && loggedIn && path === '/login') return navigate('/kelder');
   if (route.admin && session.user?.role !== 'admin') { toast('Alleen voor beheerders', 'error'); return navigate('/kelder'); }
+  if (path === '/spijs') return location.replace(`#/vanavond${query.size ? `?${query}` : ''}`);
 
   document.getElementById('topbar').hidden = !loggedIn;
   document.getElementById('bottomnav').hidden = !loggedIn;
