@@ -1,47 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, mock, test } from 'node:test';
 import { readFile } from 'node:fs/promises';
-
-// Lightweight view fixture: exercise the real views and pairing rules without a browser or network.
-class Element {
-  constructor(tag, attrs = {}, children = []) {
-    this.tag = tag;
-    this.attrs = {};
-    this.children = [];
-    this.events = {};
-    this.value = '';
-    this.hidden = false;
-    this.disabled = false;
-    this.classList = { toggle: () => {} };
-    for (const [key, value] of Object.entries(attrs)) {
-      if (key.startsWith('on')) this.addEventListener(key.slice(2).toLowerCase(), value);
-      else if (key === 'text') this.textContent = value;
-      else this.setAttribute(key, value);
-    }
-    this.append(...children);
-  }
-  setAttribute(key, value) {
-    this.attrs[key] = value;
-    if (['value', 'hidden', 'disabled'].includes(key)) this[key] = value;
-  }
-  append(...nodes) { this.children.push(...nodes.flat(Infinity).filter((n) => n !== null && n !== undefined)); }
-  prepend(node) { this.children.unshift(node); }
-  get textContent() { return this.children.map((n) => n instanceof Element ? n.textContent : String(n)).join(' '); }
-  set textContent(value) { this.children = [value]; }
-  get childElementCount() { return this.children.filter((n) => n instanceof Element).length; }
-  querySelectorAll(selector) {
-    return this.children.filter((n) => n instanceof Element).flatMap((n) => [
-      ...((selector.startsWith('.') ? String(n.attrs.class || '').split(' ').includes(selector.slice(1)) : n.tag === selector) ? [n] : []),
-      ...n.querySelectorAll(selector),
-    ]);
-  }
-  querySelector(selector) { return this.querySelectorAll(selector)[0]; }
-  addEventListener(event, fn) { (this.events[event] ??= []).push(fn); }
-  async fire(event) { for (const fn of this.events[event] || []) await fn(); }
-  click() { return this.disabled ? Promise.resolve() : this.fire('click'); }
-}
-const el = (tag, attrs, ...children) => new Element(tag, attrs, children);
-const clear = (node) => { node.children = []; return node; };
+import { el, clear, button } from './view-fixture.mjs';
 const notices = [];
 const calls = [];
 let response;
@@ -79,7 +39,6 @@ beforeEach(() => {
   response = async () => ({ picks: [], suggestions: [], summary: 'Testadvies' });
   hash = '';
 });
-const button = (root, text) => root.querySelectorAll('button').find((b) => b.textContent.includes(text));
 async function fixture(tab = '') {
   const main = el('main');
   await render(main, { query: new URLSearchParams(tab ? { tab } : {}) });

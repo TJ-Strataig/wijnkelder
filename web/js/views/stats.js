@@ -22,7 +22,7 @@ function wineList(title, items, cls, note) {
 export async function render(main) {
   const s = await api.get('/api/stats');
   const t = s.totals;
-  main.append(el('h1', { text: 'Statistieken' }));
+  main.append(el('h2', { text: 'Statistieken' }));
   main.append(el('div', { class: 'kpis' },
     kpi(t.bottles, 'flessen in de kelder'), kpi(t.wines, 'verschillende wijnen'), kpi(money(t.purchase_value), 'aankoopwaarde'),
     kpi(money(t.estimated_value), 'geschatte waarde', 'incl. prijsindicatie voor gekregen flessen'), kpi(t.consumed, 'flessen gedronken'), kpi(t.gifted_bottles, 'gekregen flessen'), kpi(t.tastings, 'proefnotities')));

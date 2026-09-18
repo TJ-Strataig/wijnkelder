@@ -1,6 +1,8 @@
 // Inzichten: smaakprofiel per persoon, prijs-kwaliteit, jaaroverzicht.
 import { el, clear, select, typeLabel, TYPE_ICONS, money, stars, wineTitle } from '../util.js';
 import { api } from '../api.js';
+import { renderTabs } from '../tabs.js';
+import { render as renderStats } from './stats.js';
 
 function bars(rows, { max = null, labelFn = (r) => r.label, valFn = (r) => r.n, fmt = (v) => String(v) } = {}) {
   const m = max ?? Math.max(1, ...rows.map(valFn));
@@ -10,16 +12,12 @@ const scoreBars = (rows) => bars(rows, { max: 100, valFn: (r) => r.avg, labelFn:
 
 export async function render(main, { query }) {
   main.append(el('h1', { text: 'Inzichten' }));
-  const tabs = el('div', { class: 'tabs' }); const body = el('div');
-  main.append(tabs, body);
-  let mode = ['taste', 'value', 'year'].includes(query.get('tab')) ? query.get('tab') : 'taste';
-  for (const [key, label] of [['taste', '👅 Smaakprofielen'], ['value', '💶 Prijs & kwaliteit'], ['year', '📅 Jaaroverzicht']]) {
-    const b = el('button', { type: 'button', class: key === mode ? 'active' : '', text: label });
-    b.addEventListener('click', () => { mode = key; tabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b)); show(); });
-    tabs.append(b);
-  }
-  async function show() { clear(body); body.append(el('p', { class: 'muted small', text: 'Laden…' })); const fn = { taste: tasteView, value: valueView, year: yearView }[mode]; await fn(body); }
-  show();
+  return renderTabs(main, { path: '/inzichten', query, tabs: [
+    { key: 'taste', label: '👅 Smaakprofielen', retain: false, render: tasteView },
+    { key: 'value', label: '💶 Prijs & kwaliteit', retain: false, render: valueView },
+    { key: 'year', label: '📅 Jaaroverzicht', retain: false, render: yearView },
+    { key: 'stats', label: '📊 Statistieken', retain: false, render: renderStats },
+  ] });
 }
 
 async function tasteView(body) {
