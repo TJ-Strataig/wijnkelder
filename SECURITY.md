@@ -71,6 +71,8 @@ De D1-export en alle 59 R2-objecten zijn lokaal opgeslagen met beperkte Windows-
 
 De oorspronkelijke `SESSION_SECRET` en `BOOTSTRAP_SECRET` zijn niet in deze back-up opgenomen; de gebruiker heeft geen bevestigde veilige kopie. Cloudflare toont bestaande secretwaarden niet opnieuw via de beheer-API. Vervang `SESSION_SECRET` niet om dit op te lossen: daarmee zijn eerder versleutelde AI-instellingen niet meer te ontsleutelen. Bewaar een eventueel teruggevonden oorspronkelijke waarde rechtstreeks in een wachtwoordmanager, nooit in chat of GitHub. De huidige codepublicatie hoeft bestaande Worker-geheimen niet te vervangen.
 
+Als het oorspronkelijke geheim bij een volledige herinstallatie niet beschikbaar is, kan een beheerder een AI-aanbiedersleutel opnieuw invoeren onder een nieuw geheim in de herstelomgeving. Deze beperkte route is op 18 september lokaal beproefd op een geheugenkopie van de echte back-up, met synthetische sleutel/testsessies en zonder netwerkverkeer. Dit herstelt niet de oude versleuteling en bewijst geen echte browser-/passkeylogin of Cloudflare-restore. Zie de noodherstelprocedure in README; verander de huidige productiegeheimen niet.
+
 ## Beveiligingsreview (september 2026)
 De volledige code (API, webapp, installatiescripts, workflows) is onderworpen aan een onafhankelijke beveiligingsreview plus een geautomatiseerde testset (`cd api && npm test`, 18 tests). Er zijn geen kritieke of hoge bevindingen gevonden. De volgende punten (1× medium, 4× laag) zijn gevonden en verholpen:
 
