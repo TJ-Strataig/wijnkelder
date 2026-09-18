@@ -169,6 +169,8 @@ Voeg onder **Settings → Secrets and variables → Actions → Repository secre
 
 `.github/workflows/cloudflare-readiness.yml` is een afzonderlijke, **niet-publicerende** toegangscontrole. Deze draait wanneer dit workflowbestand op een werkbranch wordt gepusht, en is handmatig te starten zodra het op de standaardbranch staat. Na dezelfde lokale controles gebruikt hij de twee Actions-secrets om de status van het Cloudflare-gebruikerstoken en Worker-/D1-/R2-metadata te lezen. Hij wijzigt niets en bewijst geen schrijfrechten of geslaagde deployment. Gewone branch- en PR-controles blijven zonder productiesecrets draaien.
 
+`.github/workflows/cloudflare-deploy-probe.yml` is een afzonderlijk goedgekeurde **schrijfproef**, uitsluitend op `tj-strataig-ontwikkelbasis-herstellen`. Bij wijzigingen aan die workflow of het bijbehorende proefscript publiceert hij een uniek benoemde tijdelijke Worker zonder productiebindings, publieke adressen of routes. De naam moet vooraf vrij zijn; na afloop verwijdert de workflow uitsluitend zijn eigen testworker en bevestigt diens afwezigheid. Bij een harde onderbreking van de runner moet eventueel achtergebleven testinfrastructuur afzonderlijk worden opgeruimd. Dit is geen productiepublicatie of D1/R2-schrijfproef.
+
 `.github/workflows/deploy.yml` (*Wijnkelder publiceren*) draait bij relevante pushes naar `main` of een handmatige start op `main`:
 
 1. Bepaal wijzigingen sinds de laatste geslaagde gezamenlijke release en voer dezelfde controles uit.
@@ -188,7 +190,7 @@ Dit is **geen atomaire release**: als de API slaagt maar Pages faalt, draait de 
 - Brave Search API: gratis tier (2.000 zoekopdrachten/maand) — alleen nodig als je prijsindicaties op echte webresultaten wilt baseren.
 
 ## Bijwerken van een bestaande installatie
-Ontwikkelen op een werkbranch publiceert niets. Pas een relevante push/merge naar `main` of een bewuste handmatige release start de publicatieroute. Zolang repository, Pages-instellingen, Worker-naam en configuratie gelijk blijven, blijft het adres `https://tj-strataig.github.io/wijnkelder/` hetzelfde.
+Ontwikkelen op een werkbranch publiceert geen wijzigingen aan de live app. De hierboven beschreven, afzonderlijk goedgekeurde publicatieproef kan wel een tijdelijke testworker maken en verwijderen. Pas een relevante push/merge naar `main` of een bewuste handmatige release start de productiepublicatieroute. Zolang repository, Pages-instellingen, Worker-naam en configuratie gelijk blijven, blijft het adres `https://tj-strataig.github.io/wijnkelder/` hetzelfde.
 
 Bewaar alle installatiegebonden waarden in `api/wrangler.toml` en heel `web/config.js`; neem deze bestanden niet automatisch over uit een zip of andere sessie. Het TOML-bestand moet UTF-8 **zonder BOM** blijven, ook bij opslaan vanuit Windows PowerShell.
 
@@ -200,9 +202,11 @@ De JSON-export bevat collectiegegevens, maar niet de volledige database, passkey
 
 Een beschikbare herstelperiode of geslaagde export is nog geen bewezen volledige restore. Verifieer herstel apart in een geisoleerde omgeving; test nooit door productie te overschrijven. Een bereikbaar `/api/health` bevestigt niet dat deze onderdelen in orde zijn.
 
-Stand 17 september 2026: Cloudflare-toegang werkt en beide Actions repository-secrets zijn aanwezig; hun deployrechten zijn nog niet bevestigd. De live API-versie dateert van 11 september, zonder bevestigde koppeling aan een Git-commit. De verwachte 20 tabellen, 219 kolommen en 11 expliciete indexen zijn aanwezig. D1 Time Travel levert ook een herstelpunt van de vorige dag.
+Stand 18 september 2026: Cloudflare-toegang vanuit GitHub Actions werkt. De geisoleerde publicatieproef (run `35319619418`) heeft met de Actions-secrets een tijdelijke Worker gepubliceerd, de deployment bevestigd en de Worker weer verwijderd. Daarmee zijn Worker-publicatie en verwijdering bewezen, niet een volledige productierelease met D1/R2-bindings, Pages of migraties. De eerder gelezen live API-versie dateert van 11 september, zonder bevestigde koppeling aan een Git-commit. De verwachte 20 tabellen, 219 kolommen en 11 expliciete indexen zijn aanwezig. Op 17 september leverde D1 Time Travel ook een herstelpunt van de vorige dag.
 
-Een afgeschermde lokale back-up bevat de D1-export, alle 59 R2-objecten met metadata en SHA-256, en de installatieconfiguratie. De export is hersteld in een aparte lokale SQLite-database: integriteit en relaties zijn in orde en alle 58 unieke fotoreferenties zijn aanwezig. Dit is geen volledige Cloudflare-/browserherstelproef of atomaire D1/R2-snapshot. De oorspronkelijke Worker-geheimen zijn niet opgenomen en hun veilige bewaring is nog onbevestigd; er is ook nog geen versleutelde kopie op een ander apparaat. Laat bestaande Worker-geheimen staan: vooral het vervangen van `SESSION_SECRET` maakt eerder versleutelde instellingen onleesbaar.
+Een afgeschermde lokale back-up bevat de D1-export, alle 59 R2-objecten met metadata en SHA-256, en de installatieconfiguratie. De export is hersteld in een aparte lokale SQLite-database: integriteit en relaties zijn in orde en alle 58 unieke fotoreferenties zijn aanwezig. Dit is geen volledige Cloudflare-/browserherstelproef of atomaire D1/R2-snapshot. Een AES-256-versleuteld 7-Zip-archief met versleutelde bestandsnamen is lokaal gecontroleerd en met gelijke SHA-256 gekopieerd naar persoonlijke OneDrive. De gebruiker heeft bevestigd dat het bestand online staat en het wachtwoord afzonderlijk veilig is bewaard; een onafhankelijke downloadcontrole is niet uitgevoerd.
+
+De oorspronkelijke Worker-geheimen zijn niet opgenomen en zijn ook niet teruggevonden in de onderzochte oorspronkelijke projectmap. Laat bestaande Worker-geheimen staan: vooral het vervangen van `SESSION_SECRET` maakt eerder versleutelde instellingen onleesbaar. Voor een volledige herinstallatie zonder die oorspronkelijke waarde moet een afzonderlijke herstelroute worden uitgewerkt en beproefd, inclusief het opnieuw invoeren van de AI-aanbiedersleutel.
 
 ### Pushmeldingen inschakelen (optioneel)
 Meldingen verschijnen altijd in de app (🔔). Voor échte pushmeldingen op de telefoon heeft de server eenmalig een sleutelpaar nodig:
