@@ -20,10 +20,17 @@ import * as producers from './views/producers.js';
 
 const NAV = [
   { path: '/kelder', label: 'Kelder', ico: '🍷' },
-  { path: '/toevoegen', label: 'Toevoegen', ico: '＋' },
   { path: '/sommelier', label: 'Sommelier', ico: '🎩' },
-  { path: '/vanavond', label: 'Vanavond', ico: '🥂' },
   { path: '/meer', label: 'Meer', ico: '☰' },
+];
+
+const MENU_GROUPS = [
+  { path: '/voorraad', label: 'Voorraad', links: [
+    ['/voorraad', 'Voorraad & beheer'], ['/herkomst', 'Herkomst'], ['/wijnhuizen', 'Wijnhuizen'],
+  ] },
+  { path: '/sommelier', label: 'Sommelier', links: [
+    ['/sommelier', 'Chat'], ['/vanavond', 'Vanavond'], ['/verlanglijst', 'Verlanglijst'],
+  ] },
 ];
 
 const ROUTES = [
@@ -64,11 +71,11 @@ function renderNav(active) {
   const side = document.getElementById('sidenav');
   const bottom = document.getElementById('bottomnav');
   clear(side); clear(bottom);
-  const items = [...NAV.filter((n) => n.path !== '/meer'), { path: '/historie', label: 'Historie', ico: '📜' }, { path: '/inzichten', label: 'Inzichten', ico: '👅' }, { path: '/voorraad', label: 'Voorraad', ico: '🛒' }, { path: '/herkomst', label: 'Herkomst', ico: '🗺️' }, { path: '/wijnhuizen', label: 'Wijnhuizen', ico: '🏡' }, { path: '/verlanglijst', label: 'Verlanglijst', ico: '📝' }];
+  const items = [...NAV.filter((n) => n.path !== '/meer'), { path: '/historie', label: 'Historie', ico: '📜' }, { path: '/inzichten', label: 'Inzichten', ico: '👅' }, { path: '/voorraad', label: 'Voorraad', ico: '🛒' }];
   items.push({ path: '/instellingen', label: 'Instellingen', ico: '⚙️' });
   for (const n of items) side.append(el('a', { href: `#${n.path}`, class: active === n.path ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));
   for (const n of NAV) {
-    const isActive = active === n.path || (n.path === '/meer' && ['/historie', '/inzichten', '/voorraad', '/herkomst', '/wijnhuizen', '/verlanglijst', '/instellingen'].includes(active));
+    const isActive = active === n.path || (n.path === '/meer' && ['/historie', '/inzichten', '/voorraad', '/instellingen'].includes(active));
     bottom.append(el('a', { href: `#${n.path}`, class: isActive ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));
   }
   document.getElementById('user-chip').textContent = user ? user.name : '';
@@ -79,14 +86,9 @@ function renderMore(main) {
   const user = session.user;
   const links = [
     ['/historie', '📜', 'Historie', 'Gedronken flessen, proefnotities, activiteitenlog'],
-    ['/sommelier', '🎩', 'De Sommelier', 'Chat: vraag, etiket of wijnkaart — alleen over wijn'],
-    ['/vanavond', '🥂', 'Vanavond: spijs & wijn', 'Gerecht, stemming en kelderwijnen — of kies eerst een wijn'],
+    ['/sommelier', '🎩', 'De Sommelier', 'Chat, Vanavond: spijs & wijn, restaurantadvies en verlanglijst'],
     ['/inzichten', '👅', 'Inzichten', 'Smaakprofielen, prijs-kwaliteit, jaaroverzicht en statistieken'],
-    ['/voorraad', '🛒', 'Voorraad & beheer', 'Aankooplijst met budget, inventarisatie, cadeau-register'],
-    ['/vanavond?tab=restaurant', '🍽️', 'Restaurant-modus', 'Wijnkaart fotograferen en advies krijgen'],
-    ['/herkomst', '🗺️', 'Herkomst', 'Topografische kaart: waar komen onze wijnen vandaan?'],
-    ['/wijnhuizen', '🏡', 'Wijnhuizen', 'Producenten in onze kelder; dubbele schrijfwijzen samenvoegen'],
-    ['/verlanglijst', '📝', 'Verlanglijst', 'Wijnen die we nog willen kopen'],
+    ['/voorraad', '🛒', 'Voorraad', 'Aankooplijst, inventarisatie, cadeaus, herkomst en wijnhuizen'],
     ['/instellingen', '⚙️', 'Instellingen', user?.role === 'admin' ? 'Passkeys, app, export en huishoudbeheer' : 'Passkeys, app en export'],
   ].filter(Boolean);
   main.append(el('h1', { text: 'Meer' }), el('div', { class: 'stack' }, links.map(([p, ico, t, d]) =>
@@ -146,7 +148,8 @@ async function render() {
 
   document.getElementById('topbar').hidden = !loggedIn;
   document.getElementById('bottomnav').hidden = !loggedIn;
-  if (loggedIn) renderNav(path.startsWith('/wijn/') ? '/kelder' : path);
+  const group = MENU_GROUPS.find((item) => item.links.some(([link]) => link === path));
+  if (loggedIn) renderNav(group?.path || (path.startsWith('/wijn/') || path === '/toevoegen' ? '/kelder' : path));
 
   if (currentView?.destroy) currentView.destroy();
   currentView = null;
@@ -154,6 +157,11 @@ async function render() {
   // Give each navigation its own main element, detached on the next navigation.
   const content = mainTemplate.cloneNode(false);
   main.replaceWith(content);
+  if (group) content.append(el('nav', { class: 'tabs section-menu', 'aria-label': group.label },
+    group.links.map(([link, label]) => el('a', {
+      href: `#${link}`, class: link === path ? 'active' : '',
+      ...(link === path ? { 'aria-current': 'page' } : {}),
+    }, label))));
   content.scrollTop = 0; window.scrollTo(0, 0);
   const params = path.match(route.pattern).slice(1);
   try {
