@@ -7,7 +7,7 @@ alle leden zien en beheren dezelfde collectie.
 ## Wat kan de app?
 
 **Collectie**
-- **Navigatie**: bulk-invoer en de beoordelingswachtrij staan onder **Toevoegen → Bulk**; statistieken onder **Inzichten → Statistieken**; huishoudbeheer onder **Instellingen → Beheer** (alleen voor beheerders). Oude links blijven naar de juiste onderdelen verwijzen.
+- **Navigatie**: toevoegen gaat via **Kelder → Wijn toevoegen**, met bulk-invoer en de beoordelingswachtrij onder **Toevoegen → Bulk**. **Voorraad** bevat ook **Herkomst** en **Wijnhuizen**; **Sommelier** bevat **Chat**, **Vanavond** en **Verlanglijst**. Statistieken staan onder **Inzichten → Statistieken**; huishoudbeheer onder **Instellingen → Beheer** (alleen voor beheerders). Oude links blijven naar de juiste onderdelen verwijzen.
 - **AI naar keuze**: onder *Instellingen → AI-sommelier* kiest de beheerder tussen **Anthropic (Claude Sonnet 4.5, Opus 4.1, Haiku 4.5, …)** en **OpenAI**, voert de API-sleutel in (versleuteld opgeslagen) en test de verbinding met één klik.
 - **Bulk toevoegen**: kies meerdere etiketfoto's tegelijk (van één of verschillende wijnhuizen) of fotografeer fles na fles. Gedeelde aankoopgegevens (datum, winkel, kelderlocatie) vul je één keer in; **aantal en prijs per fles** apart. De AI herkent de etiketten; jij controleert en keurt **elke fles apart goed** voordat hij in de kelder komt. Duplicaten worden herkend en als extra flessen bijgeboekt.
 - **Later beoordelen**: zet het vinkje aan en de foto's + herkenning gaan naar een **beoordelingswachtrij op de server**. Maak onderweg of in de winkel de foto's op je telefoon, en loop ze later op de desktop rustig door (bewaren, goedkeuren, overslaan). Alle huishoudleden zien dezelfde wachtrij, gegroepeerd per partij.

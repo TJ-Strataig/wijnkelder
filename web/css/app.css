@@ -244,8 +244,10 @@ legend { font-family: var(--font-serif); font-weight: 600; color: var(--bordeaux
 .history-item .ph { width: 48px; height: 48px; border-radius: 8px; display: grid; place-items: center; font-size: 1.3rem; }
 code { background: var(--paper); padding: 0.1rem 0.35rem; border-radius: 6px; font-size: 0.85em; overflow-wrap: anywhere; }
 .tabs { display: flex; gap: 0.3rem; border-bottom: 1px solid var(--line); margin-bottom: 1rem; overflow-x: auto; }
-.tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 0.6rem 0.9rem; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
-.tabs button.active { color: var(--bordeaux-light); border-bottom-color: var(--gold); font-weight: 600; }
+.tabs button, .section-menu a { background: none; border: 0; border-bottom: 3px solid transparent; padding: 0.6rem 0.9rem; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.tabs button.active, .section-menu a.active { color: var(--bordeaux-light); border-bottom-color: var(--gold); font-weight: 600; }
+.section-menu { flex-shrink: 0; }
+.section-menu a { text-decoration: none; min-height: 44px; }
 [data-theme="dark"] .tabs button.active { color: var(--gold); }
 @media print { .topbar, .bottomnav, .btn, .toolbar, .filters { display: none !important; } }
 

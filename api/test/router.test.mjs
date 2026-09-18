@@ -45,4 +45,40 @@ test('late navigation renders are detached, disposed and cannot redirect the cur
   await listeners.hashchange();
   assert.equal(currentDisposed, 1);
   assert.equal(document.getElementById('main').textContent, 'history');
+
+  const mainLinks = (id) => document.getElementById(id).querySelectorAll('a').map((a) => a.attrs.href);
+  for (const id of ['sidenav', 'bottomnav']) {
+    for (const path of ['/toevoegen', '/herkomst', '/wijnhuizen', '/vanavond', '/verlanglijst']) {
+      assert.ok(!mainLinks(id).includes(`#${path}`));
+    }
+  }
+  assert.deepEqual(mainLinks('bottomnav'), ['#/kelder', '#/sommelier', '#/meer']);
+  for (const [parent, routes, views, bottom] of [
+    ['/voorraad', ['/voorraad', '/herkomst', '/wijnhuizen'], ['manage', 'map', 'producers'], '/meer'],
+    ['/sommelier', ['/sommelier', '/vanavond', '/verlanglijst'], ['chat', 'tonight', 'wishlist'], '/sommelier'],
+  ]) {
+    for (const [i, path] of routes.entries()) {
+      location.hash = `#${path}${path === '/vanavond' ? '?tab=restaurant' : ''}`;
+      await listeners.hashchange();
+      const main = document.getElementById('main');
+      const menu = main.querySelector('.section-menu');
+      assert.deepEqual(menu.querySelectorAll('a').map((a) => a.attrs.href), routes.map((p) => `#${p}`));
+      assert.equal(menu.querySelector('[aria-current="page"]').attrs.href, `#${path}`);
+      assert.equal(main.querySelector('p').textContent, views[i]);
+      assert.equal(document.getElementById('sidenav').querySelector('.active').attrs.href, `#${parent}`);
+      assert.equal(document.getElementById('bottomnav').querySelector('.active').attrs.href, `#${bottom}`);
+    }
+  }
+  location.hash = '#/toevoegen?tab=bulk';
+  await listeners.hashchange();
+  assert.equal(document.getElementById('main').querySelector('p').textContent, 'add');
+  assert.equal(document.getElementById('sidenav').querySelector('.active').attrs.href, '#/kelder');
+  location.hash = '#/meer';
+  await listeners.hashchange();
+  const moreLinks = mainLinks('main');
+  for (const path of ['/toevoegen', '/herkomst', '/wijnhuizen', '/vanavond', '/verlanglijst']) {
+    assert.ok(!moreLinks.some((link) => link.startsWith(`#${path}`)));
+  }
+  assert.ok(moreLinks.includes('#/voorraad'));
+  assert.ok(moreLinks.includes('#/sommelier'));
 });
