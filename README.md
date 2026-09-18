@@ -52,6 +52,7 @@ alle leden zien en beheren dezelfde collectie.
 - **Jaaroverzicht** — flessen gedronken/gekocht/gekregen, uitgegeven, beste fles, oudste fles, meest gedronken, per maand/type/land/gelegenheid/plek.
 - **Aankooplijst met budget** — voorraaddoelen ("min. 6 doordeweekse witte onder € 12"); tekorten, geschatte kosten en suggesties uit wijnen die eerder goed scoorden.
 - **Inventarisatie** — telronde: verwacht vs. geteld per wijn, verschillen zichtbaar, ontbrekende flessen desgewenst afboeken.
+
 - **Cadeau-register** — gekregen flessen per gever, gelegenheid, en een herinnering om te bedanken na het openen.
 - **Streepjescode** — scan de EAN met de camera: bestaande wijn direct gevonden (bijboeken), anders productgegevens als startpunt.
 - **Laatste fles** — bij het openen van de laatste fles van een favoriet: met één tik op de verlanglijst.
@@ -68,6 +69,16 @@ alle leden zien en beheren dezelfde collectie.
 - Wie-deed-wat activiteitenlog voor het huishouden.
 
 Zie [SECURITY.md](SECURITY.md) voor alle beveiligingsmaatregelen.
+
+### Gegevensbehoud bij bewerken en tellen
+
+Wijninvoer, flessen bijboeken/afboeken en bijbehorende proefnotities worden atomair opgeslagen: ongeldige invoer of een databasefout laat geen gedeeltelijke voorraadmutatie achter. Aantallen moeten gehele getallen zijn. Een wachtrij-item kan maar eenmaal worden goedgekeurd, ook vanaf twee apparaten tegelijk. Te grote JSON-gegevens worden geweigerd, niet afgekapt.
+
+Een inventarisatie bewaart bij de start de exacte fles-ID's en hun wijn. Afsluiten kan eenmaal en alleen zolang die voorraad niet is veranderd; bij een conflict start je een nieuwe ronde. Niet ingevulde wijntellingen behouden de verwachte aantallen. Open rondes van voor dit herstel hebben geen beginsnapshot en moeten opnieuw worden gestart. Hiervoor is geen migratie nodig: `inventory_sessions.missing` bevat tijdens een open ronde een versie-1-snapshot, en na afsluiten weer de lijst ontbrekende fles-ID's.
+
+Bij het samenvoegen van wijnhuizen blijven persoonlijke notities samen bewaard, met bronvermelding als meerdere profielen notities bevatten. Het doelprofiel blijft actief (of het eerste beschikbare profiel als er nog geen doelprofiel is); de volledige oorspronkelijke profielen worden in hetzelfde activiteitenlogrecord gearchiveerd. Bij meer dan 4000 tekens gezamenlijke notities of gelijktijdige profielwijzigingen stopt de samenvoeging zonder gedeeltelijke wijzigingen. Er is geen automatische terugdraaifunctie voor profielsamenvoegingen.
+
+Lege of ongeldige AI-prijsantwoorden overschrijven geen bestaande prijsschatting. Deze maatregelen voorkomen nieuw verlies; ze herstellen niet automatisch eerder verloren gegevens en vormen geen volledige security-audit.
 
 ## Architectuur
 

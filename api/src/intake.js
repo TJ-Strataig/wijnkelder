@@ -1,7 +1,8 @@
 // Beoordelingswachtrij: bulk-foto's die (op de telefoon) zijn geüpload en herkend, en later (op de desktop) worden goedgekeurd.
 // Niets uit deze wachtrij komt in de kelder zonder expliciete goedkeuring.
-import { HttpError, json, readJson, uuid, nowIso, str, num, oneOf, isValidPhotoKey, signPhotoUrl, logActivity } from './util.js';
+import { HttpError, json, readJson, uuid, nowIso, str, num, oneOf, isValidPhotoKey, signPhotoUrl, logActivity, jsonObject, quantity as bottleQuantity } from './util.js';
 import { createWine, addBottles } from './wines.js';
+import { mutation } from './mutation.js';
 
 const STATUSES = ['pending', 'recognized', 'failed', 'approved', 'skipped'];
 
@@ -37,8 +38,8 @@ export async function addIntake(req, env, { user }) {
     if (!isValidPhotoKey(key)) throw new HttpError(400, 'Ongeldige fotoverwijzing.');
     if (!(await env.FOTOS.get(key))) throw new HttpError(400, 'Foto niet gevonden.');
   }
-  const wine = body.wine && typeof body.wine === 'object' ? JSON.stringify(body.wine).slice(0, 20_000) : null;
-  const bottle = body.bottle && typeof body.bottle === 'object' ? JSON.stringify(body.bottle).slice(0, 4000) : null;
+  const wine = jsonObject(body.wine, { max: 20_000, name: 'Wijngegevens' });
+  const bottle = jsonObject(body.bottle, { max: 4000, name: 'Flesgegevens' });
   const status = wine ? 'recognized' : 'pending';
   const id = uuid();
   await env.DB.prepare(
@@ -55,14 +56,16 @@ export async function updateIntake(req, env, { user, params }) {
   if (row.status === 'approved') throw new HttpError(409, 'Dit item is al goedgekeurd.');
   const body = await readJson(req, 200_000);
   const sets = [], vals = [];
-  if (body.wine !== undefined) { sets.push('wine = ?'); vals.push(body.wine && typeof body.wine === 'object' ? JSON.stringify(body.wine).slice(0, 20_000) : null); }
-  if (body.bottle !== undefined) { sets.push('bottle = ?'); vals.push(body.bottle && typeof body.bottle === 'object' ? JSON.stringify(body.bottle).slice(0, 4000) : null); }
+  if (body.wine !== undefined) { sets.push('wine = ?'); vals.push(jsonObject(body.wine, { max: 20_000, name: 'Wijngegevens' })); }
+  if (body.bottle !== undefined) { sets.push('bottle = ?'); vals.push(jsonObject(body.bottle, { max: 4000, name: 'Flesgegevens' })); }
   if (body.confidence !== undefined) { sets.push('confidence = ?'); vals.push(num(body.confidence, { min: 0, max: 1 })); }
   if (body.error !== undefined) { sets.push('error = ?'); vals.push(str(body.error, { max: 500 })); }
   if (body.status !== undefined) { sets.push('status = ?'); vals.push(oneOf(body.status, ['pending', 'recognized', 'failed', 'skipped'], { name: 'Status' })); }
   if (!sets.length) return json({ ok: true });
   sets.push('updated_at = ?'); vals.push(nowIso());
-  await env.DB.prepare(`UPDATE intake_queue SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, row.id).run();
+  const result = await env.DB.prepare(`UPDATE intake_queue SET ${sets.join(', ')} WHERE id = ? AND status = ? AND updated_at = ? AND wine IS ? AND bottle IS ?`)
+    .bind(...vals, row.id, row.status, row.updated_at, row.wine, row.bottle).run();
+  if (result.meta.changes !== 1) throw new HttpError(409, 'Dit item is intussen gewijzigd of goedgekeurd. Vernieuw de wachtrij.');
   return json({ ok: true });
 }
 
@@ -73,27 +76,39 @@ export async function approveIntake(req, env, { user, params }) {
   if (!row) throw new HttpError(404, 'Item niet gevonden.');
   if (row.status === 'approved') throw new HttpError(409, 'Dit item is al goedgekeurd.');
   const body = await readJson(req, 200_000);
-  const wine = body.wine && typeof body.wine === 'object' ? body.wine : parse(row.wine, null);
-  const bottle = body.bottle && typeof body.bottle === 'object' ? body.bottle : parse(row.bottle, {}) || {};
+  const wine = body.wine === undefined ? parse(row.wine, null) : body.wine;
+  const bottle = body.bottle === undefined ? parse(row.bottle, {}) || {} : body.bottle;
+  jsonObject(bottle, { max: 4000, name: 'Flesgegevens' });
+  if (!bottle) throw new HttpError(400, 'Flesgegevens ontbreken.');
   if (!wine || !wine.name) throw new HttpError(400, 'Geen wijngegevens om goed te keuren; vul minimaal een naam in.');
-  const quantity = num(bottle.quantity, { min: 1, max: 500, int: true, name: 'Aantal' }) ?? 1;
+  const quantity = bottleQuantity(bottle.quantity, { min: 1 }) ?? 1;
+  const wineJson = jsonObject(wine, { max: 20_000, name: 'Wijngegevens' });
+  const bottleJson = jsonObject({ ...bottle, quantity }, { max: 4000, name: 'Flesgegevens' });
+  const token = uuid();
+  const writes = mutation(env, {
+    claim: env.DB.prepare("UPDATE intake_queue SET approved_wine_id = ? WHERE id = ? AND status = ? AND updated_at = ? AND wine IS ? AND bottle IS ?")
+      .bind(token, row.id, row.status, row.updated_at, row.wine, row.bottle),
+    guard: 'EXISTS (SELECT 1 FROM intake_queue WHERE id = ? AND approved_wine_id = ?)',
+    bindings: [row.id, token], conflict: 'Dit item is intussen gewijzigd of goedgekeurd. Vernieuw de wachtrij.',
+  });
+  const complete = (wineId) => {
+    writes.activity(user, 'intake.approved', 'wine', wineId, { name: wine.name, quantity });
+    writes.update('intake_queue', { status: 'approved', wine: wineJson, bottle: bottleJson, approved_wine_id: wineId, updated_at: nowIso() }, 'id = ?', [row.id]);
+  };
 
   let result;
-  const consumed = body.consumed && typeof body.consumed === 'object' ? body.consumed : undefined;
+  const consumed = body.consumed;
   const existingId = str(body.existing_wine_id, { max: 60 });
   if (existingId) {
     // Flessen bijboeken op een bestaande wijn (duplicaat)
     const fakeReq = new Request(req.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...bottle, quantity, consumed }) });
-    result = await addBottles(fakeReq, env, { user, params: { id: existingId } });
+    result = await addBottles(fakeReq, env, { user, params: { id: existingId }, writes, complete });
   } else {
     const payload = { ...wine, label_image_key: row.label_image_key || null, quantity, bottle, consumed, allow_duplicate: body.allow_duplicate === true };
     const fakeReq = new Request(req.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    result = await createWine(fakeReq, env, { user }); // gooit HttpError 409 met duplicate-info als de wijn al bestaat
+    result = await createWine(fakeReq, env, { user, writes, complete }); // gooit HttpError 409 met duplicate-info als de wijn al bestaat
   }
   const data = await result.json();
-  await env.DB.prepare("UPDATE intake_queue SET status = 'approved', wine = ?, bottle = ?, approved_wine_id = ?, updated_at = ? WHERE id = ?")
-    .bind(JSON.stringify(wine).slice(0, 20_000), JSON.stringify({ ...bottle, quantity }), data.wine.id, nowIso(), row.id).run();
-  await logActivity(env, user.id, 'intake.approved', 'wine', data.wine.id, { name: wine.name, quantity });
   return json({ ok: true, wine_id: data.wine.id, wine: data.wine });
 }
 

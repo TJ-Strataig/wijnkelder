@@ -3,7 +3,7 @@
 //  1. Onderwerpcontrole VOOR het antwoord (aparte, goedkope classificatie) → off-topic wordt beleefd afgewezen zonder de agent te raadplegen.
 //  2. Systeeminstructie die alleen wijn toestaat en elk ander verzoek laat afwijzen.
 //  3. Gereedschappen die uitsluitend wijngegevens kunnen lezen/schrijven — de agent kán niets anders.
-import { HttpError, json, readJson, uuid, nowIso, str, num, rateLimit, isValidPhotoKey, signPhotoUrl, logActivity, WINE_TYPES, BOTTLE_REMOVE_REASONS } from './util.js';
+import { HttpError, json, readJson, uuid, nowIso, str, num, rateLimit, isValidPhotoKey, signPhotoUrl, logActivity, WINE_TYPES, BOTTLE_REMOVE_REASONS, jsonObject } from './util.js';
 import { chatJson, chatWithTools } from './ai.js';
 import { findDuplicateWine } from './wines.js';
 import { tonight as tonightHandler, restaurant as restaurantHandler } from './sommelier.js';
@@ -113,7 +113,7 @@ async function runTool(env, user, name, input, ctx) {
       const bottle = { quantity: num(i.aantal, { min: 1, max: 500, int: true }) ?? 1, price: num(i.prijs, { min: 0, max: 1e5 }), purchase_place: str(i.winkel, { max: 150 }), location: str(i.locatie, { max: 120 }), gifted: !!i.gekregen_van, gifted_from: str(i.gekregen_van, { max: 120 }), purchase_date: nowIso().slice(0, 10) };
       const id = uuid();
       await env.DB.prepare('INSERT INTO intake_queue (id, status, label_image_key, wine, bottle, confidence, batch_label, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(id, 'recognized', ctx.uploadedKey || null, JSON.stringify(wijn).slice(0, 20000), JSON.stringify(bottle), num(wijn.confidence, { min: 0, max: 1 }), `Sommelier-chat · ${nowIso().slice(0, 10)}`, user.id).run();
+        .bind(id, 'recognized', ctx.uploadedKey || null, jsonObject(wijn, { max: 20000, name: 'Wijngegevens' }), jsonObject(bottle, { max: 4000, name: 'Flesgegevens' }), num(wijn.confidence, { min: 0, max: 1 }), `Sommelier-chat · ${nowIso().slice(0, 10)}`, user.id).run();
       await logActivity(env, user.id, 'intake.added', 'intake', id, { batch: 'chat', name: wijn.name });
       return { ok: true, intake_id: id, melding: 'In de beoordelingswachtrij gezet (Meer → Beoordelingswachtrij).' };
     }
@@ -225,7 +225,7 @@ export async function chat(req, env, { user }) {
   // Laag 2b: als de agent toch buiten wijn gaat (zeldzaam), vang het af
   if (!image && !WINE_HINT.test(reply) && reply.length > 200 && OBVIOUS_OFFTOPIC.test(reply)) reply = REFUSAL;
 
-  await env.DB.prepare('INSERT INTO chat_messages (id, user_id, role, content, actions) VALUES (?, ?, ?, ?, ?)').bind(uuid(), user.id, 'assistant', reply.slice(0, 6000), actions.length ? JSON.stringify(actions).slice(0, 8000) : null).run();
+  await env.DB.prepare('INSERT INTO chat_messages (id, user_id, role, content, actions) VALUES (?, ?, ?, ?, ?)').bind(uuid(), user.id, 'assistant', reply.slice(0, 6000), actions.length ? JSON.stringify(actions) : null).run();
   await logActivity(env, user.id, 'chat.message', 'chat', null, { tools: actions.map((a) => a.tool) });
   return json({ reply, actions, refused: false });
 }

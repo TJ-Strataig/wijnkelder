@@ -21,6 +21,33 @@ test.afterEach(() => { globalThis.fetch = realFetch; });
 const text = (t) => ({ content: [{ type: 'text', text: t }], stop_reason: 'end_turn' });
 const tool = (name, input, id = 'tu_1') => ({ content: [{ type: 'tool_use', id, name, input }], stop_reason: 'tool_use' });
 
+test('oversized chat intake data is rejected rather than stored as truncated JSON', async (t) => {
+  const { env, u } = await setup();
+  t.after(() => env.DB.raw.close());
+  mockModel([
+    () => tool('zet_in_wachtrij', { wijn: { name: 'Wijn', description: 'x'.repeat(20000) } }),
+    () => text('De wijngegevens zijn te groot om op te slaan.'),
+  ]);
+  const result = await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { text: 'Zet deze wijn in de wachtrij.' } });
+  assert.equal(result.status, 200);
+  assert.match(result.json.actions[0].result, /te groot/);
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM intake_queue').first()).n, 0);
+});
+
+test('chat action histories larger than 8000 characters stay complete valid JSON', async (t) => {
+  const { env, u } = await setup();
+  t.after(() => env.DB.raw.close());
+  mockModel([
+    () => ({ content: Array.from({ length: 40 }, (_, index) => tool('zoek_kelder', { zoekterm: 'Muga', notitie: 'x'.repeat(400) }, `call-${index}`).content[0]), stop_reason: 'tool_use' }),
+    () => text('De wijn is gevonden.'),
+  ]);
+  const result = await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { text: 'Zoek de wijn in de kelder.' } });
+  assert.equal(result.status, 200);
+  const saved = await env.DB.prepare("SELECT actions FROM chat_messages WHERE role = 'assistant'").first();
+  assert.ok(saved.actions.length > 8000);
+  assert.deepEqual(JSON.parse(saved.actions), result.json.actions);
+});
+
 async function setup() {
   const env = makeEnv(); const u = await seedUser(env);
   await call(worker, env, '/api/ai/settings', { method: 'PUT', token: u.token, body: { provider: 'anthropic', model: 'claude-sonnet-4-5', api_key: 'sk-ant-api03-' + 'A'.repeat(40) } });

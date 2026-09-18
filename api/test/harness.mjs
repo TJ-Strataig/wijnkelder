@@ -11,11 +11,21 @@ export function makeDb() {
       bind: (...a) => { bound = a.map((v) => (v === undefined ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v)); return api; },
       first: async () => db.prepare(sql).get(...bound) ?? null,
       all: async () => ({ results: db.prepare(sql).all(...bound) }),
-      run: async () => { const r = db.prepare(sql).run(...bound); return { meta: { changes: r.changes } }; },
+      run: () => { const r = db.prepare(sql).run(...bound); return { meta: { changes: r.changes } }; },
     };
     return api;
   };
-  return { prepare: wrap, batch: async (stmts) => Promise.all(stmts.map((s) => s.run())), raw: db };
+  return { prepare: wrap, batch: async (stmts) => {
+    db.exec('BEGIN');
+    try {
+      const results = stmts.map((s) => s.run());
+      db.exec('COMMIT');
+      return results;
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+  }, raw: db };
 }
 
 export function makeR2() {

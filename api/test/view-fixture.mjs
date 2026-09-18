@@ -41,18 +41,35 @@ export class Element {
     if (this.parent) this.parent.children = this.parent.children.filter((n) => n !== this);
     this.parent = null;
   }
+  cloneNode(deep = false) {
+    const copy = new Element(this.tag, this.attrs);
+    if (deep) copy.append(...this.children.map((node) => node instanceof Element ? node.cloneNode(true) : node));
+    return copy;
+  }
+  replaceWith(node) {
+    if (!this.parent) return;
+    const parent = this.parent, index = parent.children.indexOf(this);
+    node.remove();
+    parent.children[index] = node;
+    node.parent = parent;
+    this.parent = null;
+  }
   get textContent() { return this.children.map((n) => n instanceof Element ? n.textContent : String(n)).join(' '); }
   set textContent(value) { clear(this); this.children = [value]; }
   get childElementCount() { return this.children.filter((n) => n instanceof Element).length; }
   querySelectorAll(selector) {
+    const attribute = selector.match(/^\[([^=]+)="([^"]*)"\]$/);
+    const matches = (node) => attribute ? String(node.attrs[attribute[1]]) === attribute[2]
+      : selector.startsWith('.') ? String(node.attrs.class || '').split(' ').includes(selector.slice(1))
+        : selector.startsWith('#') ? node.attrs.id === selector.slice(1) : node.tag === selector;
     return this.children.filter((n) => n instanceof Element).flatMap((n) => [
-      ...((selector.startsWith('.') ? String(n.attrs.class || '').split(' ').includes(selector.slice(1)) : n.tag === selector) ? [n] : []),
+      ...(matches(n) ? [n] : []),
       ...n.querySelectorAll(selector),
     ]);
   }
   querySelector(selector) { return this.querySelectorAll(selector)[0]; }
   addEventListener(event, fn) { (this.events[event] ??= []).push(fn); }
-  async fire(event) { for (const fn of this.events[event] || []) await fn(); }
+  async fire(event, data = {}) { for (const fn of this.events[event] || []) await fn(data); }
   click() { return this.disabled ? Promise.resolve() : this.fire('click'); }
 }
 export const el = (tag, attrs, ...children) => new Element(tag, attrs, children);
