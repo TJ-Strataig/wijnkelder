@@ -123,7 +123,9 @@ async function callProvider(cfg, messages, { maxTokens, temperature }) {
   });
   if (!res.ok) throw await providerError(res);
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || '{}';
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) throw new HttpError(502, 'De AI gaf geen bruikbaar antwoord. Probeer het opnieuw.');
+  return content;
 }
 
 async function providerError(res) {
@@ -405,9 +407,16 @@ export async function priceEstimate(req, env, { user }) {
     },
   ], { maxTokens: 600 });
 
+  if (!result || typeof result !== 'object' || Array.isArray(result)
+    || ['price_eur', 'min_eur', 'max_eur'].some((key) => typeof result[key] !== 'number')) {
+    throw new HttpError(502, 'De AI gaf geen geldige prijsschatting. De bestaande prijs blijft bewaard.');
+  }
   const price = safeNum(result.price_eur, 0, 1e6);
   const min = safeNum(result.min_eur, 0, 1e6);
   const max = safeNum(result.max_eur, 0, 1e6);
+  if (price === null || min === null || max === null || min > price || price > max) {
+    throw new HttpError(502, 'De AI gaf geen geldige prijsschatting. De bestaande prijs blijft bewaard.');
+  }
   const source = { at: nowIso(), confidence: safeNum(result.confidence, 0, 1), reasoning: str(result.reasoning, { max: 1000 }), sources: sources.filter((s) => (Array.isArray(result.sources_used) ? result.sources_used : []).includes(s.url)).map((s) => ({ title: s.title, url: s.url })).slice(0, 5), method: sources.length ? 'web+ai' : 'ai' };
   await env.DB.prepare('UPDATE wines SET estimated_price = ?, estimated_price_min = ?, estimated_price_max = ?, estimated_price_source = ?, estimated_price_at = ?, updated_at = ? WHERE id = ?')
     .bind(price, min, max, JSON.stringify(source), nowIso(), nowIso(), w.id).run();

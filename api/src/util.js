@@ -122,6 +122,22 @@ export function bool(v) {
   return v === true || v === 1 || v === '1' || v === 'true' ? 1 : 0;
 }
 
+export function jsonObject(v, { max, name }) {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== 'object' || Array.isArray(v)) throw new HttpError(400, `${name} moet een object zijn.`);
+  const text = JSON.stringify(v);
+  if (text.length > max) throw new HttpError(400, `${name} is te groot (max ${max} tekens).`);
+  return text;
+}
+
+export function quantity(v, { min = 0, max = 500, name = 'Aantal' } = {}) {
+  if (v !== undefined && v !== null && typeof v !== 'number' && typeof v !== 'string') throw new HttpError(400, `${name} moet een geheel getal zijn.`);
+  if (typeof v === 'string' && v !== '' && !v.trim()) throw new HttpError(400, `${name} moet een geheel getal zijn.`);
+  const value = num(v, { min, max, name });
+  if (value !== null && !Number.isInteger(value)) throw new HttpError(400, `${name} moet een geheel getal zijn.`);
+  return value;
+}
+
 export function strArray(v, { maxItems = 30, maxLen = 80 } = {}) {
   if (!v) return [];
   if (typeof v === 'string') v = v.split(/[,;]/);

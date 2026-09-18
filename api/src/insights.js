@@ -1,5 +1,6 @@
 // Inzichten: smaakprofiel per persoon, prijs-kwaliteit, jaaroverzicht, voorraaddoelen, inventarisatie, cadeaus, streepjescodes, kaartlaag "gedronken".
-import { HttpError, json, readJson, uuid, nowIso, str, num, oneOf, bool, WINE_TYPES, logActivity } from './util.js';
+import { HttpError, json, readJson, uuid, nowIso, str, num, oneOf, bool, WINE_TYPES, logActivity, quantity } from './util.js';
+import { mutation } from './mutation.js';
 
 const parse = (v, fb) => { try { return v ? JSON.parse(v) : fb; } catch { return fb; } };
 const avg = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
@@ -156,14 +157,18 @@ export async function deleteTarget(req, env, { params }) {
 
 // ---- Inventarisatie ----------------------------------------------------------
 export async function startInventory(req, env, { user }) {
-  const expected = (await env.DB.prepare("SELECT COUNT(*) AS n FROM bottles WHERE status = 'in_cellar'").first()).n;
   const id = uuid();
-  await env.DB.prepare('INSERT INTO inventory_sessions (id, started_by, expected) VALUES (?, ?, ?)').bind(id, user.id, expected).run();
   const wines = (await env.DB.prepare(
     `SELECT w.id, w.name, w.producer, w.vintage, w.type, w.barcode, w.label_image_key,
             GROUP_CONCAT(b.id) AS bottle_ids, COUNT(b.id) AS expected, GROUP_CONCAT(DISTINCT b.location) AS locations
      FROM wines w JOIN bottles b ON b.wine_id = w.id AND b.status = 'in_cellar' GROUP BY w.id ORDER BY b.location, w.name`
   ).all()).results.map((w) => ({ ...w, bottle_ids: (w.bottle_ids || '').split(',').filter(Boolean) }));
+  const bottles = wines.flatMap((w) => w.bottle_ids.map((id) => ({ id, wine_id: w.id })));
+  const expected = bottles.length;
+  // Open sessions store their versioned snapshot in missing; finished sessions
+  // retain the existing missing-ID array format. No schema migration is needed.
+  await env.DB.prepare('INSERT INTO inventory_sessions (id, started_by, expected, missing) VALUES (?, ?, ?, ?)')
+    .bind(id, user.id, expected, JSON.stringify({ version: 1, bottles })).run();
   return json({ session_id: id, expected, wines });
 }
 
@@ -171,32 +176,51 @@ export async function startInventory(req, env, { user }) {
 export async function finishInventory(req, env, { user, params }) {
   const s = await env.DB.prepare('SELECT * FROM inventory_sessions WHERE id = ?').bind(params.id).first();
   if (!s) throw new HttpError(404, 'Inventarisatie niet gevonden.');
+  if (s.finished_at) throw new HttpError(409, 'Deze inventarisatie is al afgerond.');
+  const snapshot = parse(s.missing, null);
+  if (snapshot?.version !== 1 || !Array.isArray(snapshot.bottles)) throw new HttpError(409, 'Deze oudere inventarisatie heeft geen beginsnapshot. Start een nieuwe ronde.');
   const body = await readJson(req, 100_000);
-  const counts = body.counts && typeof body.counts === 'object' ? body.counts : {};
+  const counts = body.counts === undefined ? {} : body.counts;
+  if (!counts || typeof counts !== 'object' || Array.isArray(counts)) throw new HttpError(400, 'Tellingen moeten een object zijn.');
   const resolve = oneOf(body.resolve, ['report', 'remove_missing'], { name: 'Afhandeling' }) || 'report';
-  const rows = (await env.DB.prepare("SELECT b.id, b.wine_id FROM bottles b WHERE b.status = 'in_cellar' ORDER BY b.added_at").all()).results;
-  const byWine = {};
-  for (const r of rows) (byWine[r.wine_id] ||= []).push(r.id);
+  const byWine = Object.create(null);
+  for (const r of snapshot.bottles) (byWine[r.wine_id] ||= []).push(r.id);
+  for (const [id, count] of Object.entries(counts)) {
+    if (!Object.hasOwn(byWine, id)) throw new HttpError(400, 'De telling bevat een wijn die niet in deze ronde voorkomt.');
+    if (count === null || count === '' || typeof count === 'boolean' || quantity(count, { max: 100000 }) === null) throw new HttpError(400, 'Vul een geheel aantal in.');
+  }
   const missing = [], extra = [], seen = [];
   for (const [wineId, ids] of Object.entries(byWine)) {
-    const counted = Math.max(0, Math.min(1000, Number(counts[wineId] ?? ids.length)));
+    const counted = Object.hasOwn(counts, wineId) ? quantity(counts[wineId], { max: 100000 }) : ids.length;
     seen.push(...ids.slice(0, counted));
     if (counted < ids.length) missing.push(...ids.slice(counted));
     if (counted > ids.length) extra.push({ wine_id: wineId, extra: counted - ids.length });
   }
   const now = nowIso();
-  if (seen.length) for (let i = 0; i < seen.length; i += 50) await env.DB.prepare(`UPDATE bottles SET last_seen_at = ? WHERE id IN (${seen.slice(i, i + 50).map(() => '?').join(',')})`).bind(now, ...seen.slice(i, i + 50)).run();
+  const token = uuid();
+  const writes = mutation(env, {
+    claim: env.DB.prepare(`UPDATE inventory_sessions SET finished_at = ? WHERE id = ? AND finished_at IS NULL AND missing = ?
+      AND (SELECT COUNT(*) FROM bottles WHERE status = 'in_cellar') = ?
+      AND NOT EXISTS (SELECT 1 FROM json_each(?) snapshot LEFT JOIN bottles b
+        ON b.id = json_extract(snapshot.value, '$.id') AND b.wine_id = json_extract(snapshot.value, '$.wine_id')
+        WHERE b.id IS NULL OR b.status != 'in_cellar')`)
+      .bind(token, s.id, s.missing, snapshot.bottles.length, JSON.stringify(snapshot.bottles)),
+    guard: 'EXISTS (SELECT 1 FROM inventory_sessions WHERE id = ? AND finished_at = ?)',
+    bindings: [s.id, token], conflict: 'De voorraad is intussen gewijzigd of de ronde is al afgerond. Start een nieuwe inventarisatie.',
+  });
+  for (let i = 0; i < seen.length; i += 50) writes.update('bottles', { last_seen_at: now }, `id IN (${seen.slice(i, i + 50).map(() => '?').join(',')})`, seen.slice(i, i + 50));
   if (resolve === 'remove_missing' && missing.length) {
-    for (let i = 0; i < missing.length; i += 50) await env.DB.prepare(`UPDATE bottles SET status = 'other', removed_by = ?, removed_at = ?, removed_reason = 'other', removed_note = 'Niet aangetroffen bij inventarisatie' WHERE id IN (${missing.slice(i, i + 50).map(() => '?').join(',')})`).bind(user.id, now.slice(0, 10), ...missing.slice(i, i + 50)).run();
+    for (let i = 0; i < missing.length; i += 50) writes.update('bottles', { status: 'other', removed_by: user.id, removed_at: now.slice(0, 10), removed_reason: 'other', removed_note: 'Niet aangetroffen bij inventarisatie' }, `id IN (${missing.slice(i, i + 50).map(() => '?').join(',')})`, missing.slice(i, i + 50));
   }
-  await env.DB.prepare('UPDATE inventory_sessions SET finished_at = ?, seen = ?, missing = ? WHERE id = ?').bind(now, seen.length, JSON.stringify(missing), s.id).run();
-  await logActivity(env, user.id, 'inventory.finished', 'inventory', s.id, { expected: s.expected, seen: seen.length, missing: missing.length, resolved: resolve });
+  writes.activity(user, 'inventory.finished', 'inventory', s.id, { expected: s.expected, seen: seen.length, missing: missing.length, resolved: resolve });
+  writes.update('inventory_sessions', { finished_at: now, seen: seen.length, missing: JSON.stringify(missing) }, 'id = ?', [s.id]);
+  await writes.commit();
   return json({ expected: s.expected, seen: seen.length, missing: missing.length, extra, resolved: resolve });
 }
 
 export async function inventoryHistory(req, env) {
   const rows = (await env.DB.prepare('SELECT s.*, u.name AS started_by_name FROM inventory_sessions s LEFT JOIN users u ON u.id = s.started_by ORDER BY s.started_at DESC LIMIT 20').all()).results;
-  return json({ sessions: rows.map((r) => ({ ...r, missing: parse(r.missing, []).length })) });
+  return json({ sessions: rows.map((r) => ({ ...r, missing: r.finished_at ? parse(r.missing, []).length : 0 })) });
 }
 
 // ---- Cadeau-register ---------------------------------------------------------

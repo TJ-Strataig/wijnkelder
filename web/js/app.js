@@ -120,7 +120,10 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 let currentView = null;
+let renderVersion = 0;
+const mainTemplate = document.getElementById('main').cloneNode(false);
 async function render() {
+  const version = ++renderVersion;
   const { path, query } = parseHash();
   const main = document.getElementById('main');
   const route = ROUTES.find((r) => r.pattern.test(path));
@@ -146,14 +149,22 @@ async function render() {
   if (loggedIn) renderNav(path.startsWith('/wijn/') ? '/kelder' : path);
 
   if (currentView?.destroy) currentView.destroy();
-  clear(main);
-  main.scrollTop = 0; window.scrollTo(0, 0);
+  currentView = null;
+  // An obsolete renderer may still append after awaiting an API response.
+  // Give each navigation its own main element, detached on the next navigation.
+  const content = mainTemplate.cloneNode(false);
+  main.replaceWith(content);
+  content.scrollTop = 0; window.scrollTo(0, 0);
   const params = path.match(route.pattern).slice(1);
   try {
-    currentView = (await route.view.render(main, { params, query, mode: route.mode, navigate })) || null;
+    const view = (await route.view.render(content, { params, query, mode: route.mode, navigate: (path) => {
+      if (version === renderVersion) navigate(path);
+    } })) || null;
+    if (version === renderVersion) currentView = view;
+    else view?.destroy?.();
   } catch (e) {
     console.error(e);
-    main.append(el('div', { class: 'empty' }, el('div', { class: 'big', text: '🍇' }), el('p', { text: e.message || 'Er ging iets mis.' })));
+    if (version === renderVersion) content.append(el('div', { class: 'empty' }, el('div', { class: 'big', text: '🍇' }), el('p', { text: e.message || 'Er ging iets mis.' })));
   }
 }
 

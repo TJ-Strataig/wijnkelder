@@ -1,7 +1,8 @@
 // Wijnhuizen: varianten van dezelfde producent herkennen ("Muga" / "Bodegas Muga" / "Bodegas Muga S.A."),
 // overzichtelijk voorstellen om samen te voegen, en bij nieuwe wijnen meteen de juiste spelling voorstellen.
-import { HttpError, json, readJson, str, nowIso, logActivity, getSetting, setSetting } from './util.js';
+import { HttpError, json, readJson, str, nowIso, logActivity, getSetting, setSetting, uuid } from './util.js';
 import { nameKey } from './origin.js';
+import { mutation } from './mutation.js';
 
 // Strengere sleutel dan nameKey: afkortingen uitschrijven, rechtsvormen en voegwoorden weglaten.
 export function producerKey(s) {
@@ -101,25 +102,38 @@ export async function mergeProducers(req, env, { user }) {
   if (names.length < 1) throw new HttpError(400, 'Geef minstens één te hernoemen wijnhuis op.');
   if (names.length > 50) throw new HttpError(400, 'Te veel namen tegelijk.');
   const from = names.filter((n) => n !== target);
-  let wines = 0, wishlist = 0;
-  for (const n of from) {
-    wines += (await env.DB.prepare('UPDATE wines SET producer = ?, updated_at = ? WHERE producer = ?').bind(target, nowIso(), n).run()).meta?.changes || 0;
-    wishlist += (await env.DB.prepare('UPDATE wishlist SET producer = ? WHERE producer = ?').bind(target, n).run()).meta?.changes || 0;
-  }
-  // Profiel: als de doelnaam nog geen profiel heeft maar een variant wel, neem dat over; overige variantprofielen vervallen.
   const targetKey = nameKey(target);
-  const profiles = (await env.DB.prepare('SELECT id, name, name_key FROM producers').all()).results;
-  const has = profiles.find((p) => p.name_key === targetKey);
-  const fromKeys = new Set(from.map(nameKey));
-  const orphans = profiles.filter((p) => p.name_key !== targetKey && fromKeys.has(p.name_key));
-  if (!has && orphans.length) {
-    const keep = orphans.shift();
-    await env.DB.prepare('UPDATE producers SET name = ?, name_key = ?, updated_by = ?, updated_at = ? WHERE id = ?').bind(target, targetKey, user.id, nowIso(), keep.id).run();
-  } else if (has && has.name !== target) {
-    await env.DB.prepare('UPDATE producers SET name = ?, updated_by = ?, updated_at = ? WHERE id = ?').bind(target, user.id, nowIso(), has.id).run();
+  const keys = JSON.stringify([...new Set([targetKey, ...from.map(nameKey)])]);
+  const profiles = (await env.DB.prepare('SELECT * FROM producers WHERE name_key IN (SELECT value FROM json_each(?)) ORDER BY id').bind(keys).all()).results;
+  const keep = profiles.find((p) => p.name_key === targetKey) || profiles[0];
+  const notes = profiles.filter((p) => p.notes);
+  const combinedNotes = notes.length < 2 ? notes[0]?.notes || null : notes.map((p) => `${p.name}:\n${p.notes}`).join('\n\n');
+  if (combinedNotes?.length > 4000) throw new HttpError(409, 'De gezamenlijke notities zijn te lang. Bewaar en verkort ze eerst; er is niets samengevoegd.');
+  let writes = mutation(env);
+  if (keep) {
+    const token = uuid();
+    const differs = Object.keys(keep).map((column) => `p.${column} IS NOT json_extract(x.value, '$.${column}')`).join(' OR ');
+    writes = mutation(env, {
+      claim: env.DB.prepare(`UPDATE producers SET updated_at = ? WHERE id = ?
+        AND (SELECT COUNT(*) FROM producers WHERE name_key IN (SELECT value FROM json_each(?))) = ?
+        AND NOT EXISTS (SELECT 1 FROM json_each(?) x LEFT JOIN producers p ON p.id = json_extract(x.value, '$.id') WHERE p.id IS NULL OR ${differs})`)
+        .bind(token, keep.id, keys, profiles.length, JSON.stringify(profiles)),
+      guard: 'EXISTS (SELECT 1 FROM producers WHERE id = ? AND updated_at = ?)',
+      bindings: [keep.id, token], conflict: 'Een wijnhuisprofiel is intussen gewijzigd. Vernieuw de pagina voordat je samenvoegt.',
+    });
   }
-  for (const o of orphans) await env.DB.prepare('DELETE FROM producers WHERE id = ?').bind(o.id).run();
-  await logActivity(env, user.id, 'producer.merged', 'producer', null, { target, from, wines });
+  const wineWrites = [], wishlistWrites = [];
+  for (const name of from) {
+    wineWrites.push(writes.update('wines', { producer: target, updated_at: nowIso() }, 'producer = ?', [name]));
+    wishlistWrites.push(writes.update('wishlist', { producer: target }, 'producer = ?', [name]));
+  }
+  // Preserve the full original profiles in the same transaction for recovery.
+  writes.activity(user, 'producer.merged', 'producer', keep?.id || null, { target, from, profiles });
+  for (const profile of profiles) if (profile.id !== keep.id) writes.delete('producers', 'id = ?', [profile.id]);
+  if (keep) writes.update('producers', { name: target, name_key: targetKey, notes: combinedNotes, updated_by: user.id, updated_at: nowIso() }, 'id = ?', [keep.id]);
+  const results = await writes.commit();
+  const wines = wineWrites.reduce((n, index) => n + results[index].meta.changes, 0);
+  const wishlist = wishlistWrites.reduce((n, index) => n + results[index].meta.changes, 0);
   return json({ ok: true, target, wines, wishlist });
 }
 

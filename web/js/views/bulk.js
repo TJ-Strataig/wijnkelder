@@ -134,9 +134,13 @@ function uploadView(body, existing, { refreshCount }) {
   function addFiles(files) {
     const imgs = files.filter((f) => f.type.startsWith('image/'));
     if (!imgs.length) return toast('Geen afbeeldingen gevonden', 'error');
-    for (const f of imgs) items.push({ id: crypto.randomUUID(), file: f, status: 'wachten', deferred: later.input.checked });
+    for (const f of imgs) {
+      const item = { id: crypto.randomUUID(), file: f, status: 'wachten', deferred: later.input.checked };
+      items.push(item);
+      list.append(card(item));
+    }
     toast(`${imgs.length} foto${imgs.length === 1 ? '' : "'s"} toegevoegd${later.input.checked ? ' — gaan naar de wachtrij' : ''}`, 'ok');
-    drawAll(); runQueue();
+    updateProgress(); runQueue();
   }
 
   async function runQueue() {
@@ -182,7 +186,6 @@ function uploadView(body, existing, { refreshCount }) {
     if (c('overgeslagen')) parts.push(`${c('overgeslagen')} overgeslagen`);
     progressText.textContent = items.length ? `${items.length} foto's · ${parts.join(' · ')}` : '';
   }
-  function drawAll() { clear(list); for (const it of items) list.append(card(it)); updateProgress(); }
   function draw(it) { const old = list.querySelector(`[data-id="${it.id}"]`); const fresh = card(it); old ? old.replaceWith(fresh) : list.append(fresh); }
 
   function card(it) {
@@ -208,6 +211,8 @@ function uploadView(body, existing, { refreshCount }) {
   }
 
   function reviewBlock(it) {
+    let busy = false;
+    const setBusy = (value) => { busy = value; for (const button of wrap.querySelectorAll('button')) button.disabled = value; };
     const wf = wineFields(it.wine);
     const bf = bottleFields({ ...batch.values(), quantity: 1 });
     const wrap = el('div');
@@ -216,8 +221,9 @@ function uploadView(body, existing, { refreshCount }) {
     wrap.append(wf.node, el('div', { style: { padding: '0.6rem', margin: '0.4rem 0', background: 'var(--paper)', borderRadius: '10px' } }, bf.node, df.node));
     const approveBtn = el('button', { class: 'btn gold', type: 'button', text: '✓ Goedkeuren en toevoegen' });
     approveBtn.addEventListener('click', async () => {
+      if (busy) return;
       const w = wf.values(); if (!w.name) return toast('Vul een naam in', 'error');
-      approveBtn.disabled = true; approveBtn.textContent = 'Toevoegen…';
+      setBusy(true); approveBtn.textContent = 'Toevoegen…';
       it.wine = w; it.bottle = bf.values(); const consumed = df.values() || undefined;
       try {
         let labelKey = null; if (it.blob) { try { labelKey = (await api.upload(it.blob)).key; } catch { /* foto optioneel */ } }
@@ -227,21 +233,23 @@ function uploadView(body, existing, { refreshCount }) {
         catch (e) {
           if (e.status !== 409 || !e.data?.duplicate) throw e;
           const choice = await duplicateDialog(e.data.duplicate, { quantity: it.bottle.quantity });
-          if (!choice) { approveBtn.disabled = false; approveBtn.textContent = '✓ Goedkeuren en toevoegen'; return; }
+          if (!choice) { setBusy(false); approveBtn.textContent = '✓ Goedkeuren en toevoegen'; return; }
           r = await create(choice === 'merge' ? { merge_into: e.data.duplicate.id } : { allow_duplicate: true });
         }
         it.savedId = r.wine.id; it.status = 'goedgekeurd';
         existing.push({ id: r.wine.id, name: w.name, producer: w.producer, vintage: w.vintage, bottles_in_cellar: it.bottle.quantity });
         invalidateWines(); toast(`${wineTitle(w)} toegevoegd`, 'ok');
-      } catch (e) { toast(e.message, 'error'); approveBtn.disabled = false; approveBtn.textContent = '✓ Goedkeuren en toevoegen'; return; }
+      } catch (e) { toast(e.message, 'error'); setBusy(false); approveBtn.textContent = '✓ Goedkeuren en toevoegen'; return; }
       draw(it); updateProgress();
     });
     const deferBtn = el('button', { class: 'btn ghost sm', type: 'button', text: 'Later beoordelen', title: 'Naar de beoordelingswachtrij', onClick: async () => {
+      if (busy) return;
+      setBusy(true);
       try {
         const up = it.blob ? await api.upload(it.blob) : null;
         await api.post('/api/intake', { label_image_key: up?.key || null, batch_label: batch.label(), bottle: bf.values(), wine: wf.values(), confidence: it.confidence });
         it.status = 'opgeslagen'; toQueueBtn.hidden = false; refreshCount(); draw(it); updateProgress();
-      } catch (e) { toast(e.message, 'error'); }
+      } catch (e) { toast(e.message, 'error'); setBusy(false); }
     } });
     wrap.append(el('div', { class: 'row' }, approveBtn, deferBtn, el('button', { class: 'btn ghost sm', type: 'button', text: 'Overslaan', onClick: () => { it.status = 'overgeslagen'; draw(it); updateProgress(); } })));
     return wrap;

@@ -124,7 +124,7 @@ function variantGroup(g, done) {
   }
   const mergeBtn = el('button', { class: 'btn gold sm', type: 'button', text: '🔗 Samenvoegen onder deze naam', onClick: async () => {
     const t = target.value.trim(); if (!t) return toast('Vul een naam in', 'error');
-    const ok = await confirmDialog('Wijnhuizen samenvoegen', `Alle ${g.wines} wijnen van ${g.variants.map((v) => `"${v.name}"`).join(', ')} worden geregistreerd onder "${t}". Het AI-profiel en jullie notities blijven bewaard. Dit is per wijn terug te draaien via Bewerken.`, { okLabel: 'Samenvoegen' });
+    const ok = await confirmDialog('Wijnhuizen samenvoegen', `Alle ${g.wines} wijnen van ${g.variants.map((v) => `"${v.name}"`).join(', ')} worden geregistreerd onder "${t}". Jullie notities worden samengevoegd. Het doelprofiel blijft staan; de oorspronkelijke profielen worden in het activiteitenlog bewaard. Bewerken draait alleen de naam per wijn terug, niet de samenvoeging van profielen.`, { okLabel: 'Samenvoegen' });
     if (!ok) return;
     mergeBtn.disabled = true;
     try { const r = await api.post('/api/producers/merge', { names: g.variants.map((v) => v.name), target: t }); invalidateWines(); toast(`${r.wines} wijn${r.wines === 1 ? '' : 'en'} bijgewerkt naar "${t}"`, 'ok'); done(); }

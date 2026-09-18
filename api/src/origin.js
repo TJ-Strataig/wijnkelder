@@ -195,7 +195,7 @@ export async function updateProducer(req, env, { user, params }) {
   if (!p) throw new HttpError(404, 'Producent niet gevonden.');
   const body = await readJson(req, 20_000);
   const fields = {
-    notes: str(body.notes, { max: 4000 }), website: body.website === undefined ? undefined : safeHttpsUrl(body.website),
+    notes: body.notes === undefined ? undefined : str(body.notes, { max: 4000 }), website: body.website === undefined ? undefined : safeHttpsUrl(body.website),
     description: body.description === undefined ? undefined : str(body.description, { max: 3000 }),
     latitude: body.latitude === undefined ? undefined : num(body.latitude, { min: -90, max: 90 }),
     longitude: body.longitude === undefined ? undefined : num(body.longitude, { min: -180, max: 180 }),
