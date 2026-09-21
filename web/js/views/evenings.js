@@ -51,7 +51,8 @@ async function detail(main, id, navigate) {
         e.mood ? el('div', { text: `Stemming: ${e.mood}` }) : null,
         e.guests ? el('div', { text: `Gasten: ${e.guests}` }) : null,
         e.notes ? el('p', { text: e.notes }) : null,
-        e.selection_id ? el('a', { href: `#/selecties/${e.selection_id}`, text: `Selectie: ${e.selection_name || 'openen'} →` }) : null));
+        e.selection_id ? el('a', { href: `#/selecties/${e.selection_id}`, text: `Selectie: ${e.selection_name || 'openen'} →` }) : null),
+      el('a', { class: 'btn gold', href: `#/blindproeven?evening=${encodeURIComponent(id)}`, text: '🕵️ Blindproeverij voor deze avond maken' }));
   }
   await load();
 }

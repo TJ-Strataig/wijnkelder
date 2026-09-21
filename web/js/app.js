@@ -20,6 +20,7 @@ import * as manage from './views/manage.js';
 import * as producers from './views/producers.js';
 import * as selections from './views/selections.js';
 import * as evenings from './views/evenings.js';
+import * as blindTastings from './views/blindTastings.js';
 
 const NAV = [
   { path: '/kelder', label: 'Kelder', ico: '🍷' },
@@ -36,6 +37,7 @@ const MENU_GROUPS = [
   ] },
   { path: '/selecties', label: 'Selecties', links: [['/selecties', 'Selecties']] },
   { path: '/avonden', label: 'Avondplanning', links: [['/avonden', 'Avonden']] },
+  { path: '/blindproeven', label: 'Blindproeven', links: [['/blindproeven', 'Blindproeven']] },
 ];
 
 const ROUTES = [
@@ -62,6 +64,8 @@ const ROUTES = [
   { pattern: /^\/selecties\/([^/]+)$/, view: selections },
   { pattern: /^\/avonden$/, view: evenings },
   { pattern: /^\/avonden\/([^/]+)$/, view: evenings },
+  { pattern: /^\/blindproeven$/, view: blindTastings },
+  { pattern: /^\/blindproeven\/([^/]+)$/, view: blindTastings },
   { pattern: /^\/meer$/, view: { render: renderMore } },
 ];
 
@@ -101,6 +105,7 @@ function renderMore(main) {
     ['/voorraad', '🛒', 'Voorraad', 'Aankooplijst, inventarisatie, cadeaus, herkomst en wijnhuizen'],
     ['/selecties', '🍷', 'Selecties', 'Bewaar lijsten van wijnen voor een diner, thema of proeverij'],
     ['/avonden', '🌙', 'Avondplanning', 'Plan diners, restaurantbezoeken en wijnselecties'],
+    ['/blindproeven', '🕵️', 'Blindproeven', 'Organiseer een blindproeverij en verzamel anonieme proefnotities'],
     ['/instellingen', '⚙️', 'Instellingen', user?.role === 'admin' ? 'Passkeys, app, export en huishoudbeheer' : 'Passkeys, app en export'],
   ].filter(Boolean);
   main.append(el('h1', { text: 'Meer' }), el('div', { class: 'stack' }, links.map(([p, ico, t, d]) =>

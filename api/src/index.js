@@ -12,6 +12,7 @@ import * as agent from './agent.js';
 import * as producers from './producers.js';
 import * as selections from './selections.js';
 import * as evenings from './evenings.js';
+import * as blindTastings from './blindTastings.js';
 
 const routes = [];
 function route(method, pattern, handler, { auth: needsAuth = true, admin = false } = {}) {
@@ -68,6 +69,16 @@ route('POST',   '/api/evenings', evenings.createEvening);
 route('GET',    '/api/evenings/:id', evenings.getEveningDetail);
 route('PATCH',  '/api/evenings/:id', evenings.updateEvening);
 route('DELETE', '/api/evenings/:id', evenings.deleteEvening);
+route('GET',    '/api/blind-tastings', blindTastings.listBlindTastings);
+route('POST',   '/api/blind-tastings', blindTastings.createBlindTasting);
+route('GET',    '/api/blind-tastings/:id', blindTastings.getBlindTasting);
+route('POST',   '/api/blind-tastings/:id/open', blindTastings.openBlindTasting);
+route('POST',   '/api/blind-tastings/:id/reveal', blindTastings.revealBlindTasting);
+route('POST',   '/api/blind-tastings/:id/cancel', blindTastings.cancelBlindTasting);
+route('GET',    '/api/blind-tastings/:id/flight', blindTastings.flight);
+route('GET',    '/api/blind-tastings/:id/results', blindTastings.results);
+route('POST',   '/api/blind-tastings/:id/codes/:code/tasting', blindTastings.upsertEntry);
+route('POST',   '/api/blind-tastings/:id/entries/:code', blindTastings.upsertEntry);
 route('GET',    '/api/export.json', wines.exportAll);
 route('GET',    '/api/export.csv', wines.exportCsv);
 route('POST',   '/api/photos', wines.uploadPhoto);
