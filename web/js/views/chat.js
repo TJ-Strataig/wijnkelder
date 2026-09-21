@@ -15,6 +15,7 @@ const TOOL_LABEL = { zoek_kelder: 'kelder doorzocht', wijn_details: 'wijn bekeke
 
 export async function render(main) {
   main.classList.add('chat-main');
+  document.body.classList.add('chat-active');
   const head = el('div', { class: 'row between chat-head' },
     el('div', {}, el('h1', { style: { margin: 0 }, text: '🍷 De Sommelier' }), el('div', { class: 'small muted', text: 'Praat alleen over wijn. Stuur een etiket, een wijnkaart of een vraag.' })),
     el('button', { class: 'btn ghost sm', type: 'button', text: 'Gesprek wissen', onClick: async () => { if (await confirmDialog('Gesprek wissen', 'Alle berichten in deze chat verwijderen? Je kelder blijft ongemoeid.', { okLabel: 'Wissen', danger: true })) { await api.del('/api/sommelier/chat'); load(); } } }));
@@ -130,5 +131,5 @@ export async function render(main) {
   }
 
   await load();
-  return { destroy() { main.classList.remove('chat-main'); } };
+  return { destroy() { main.classList.remove('chat-main'); document.body.classList.remove('chat-active'); } };
 }

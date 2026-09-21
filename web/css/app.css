@@ -34,6 +34,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; width: 100%; max-width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body.chat-active { overflow: hidden; }
 img, svg, video, canvas { max-width: 100%; }
 body {
   font-family: var(--font-sans);
@@ -416,6 +417,7 @@ a[href^="http"], code { overflow-wrap: anywhere; }
 }
 
 /* ===== Sommelier-chat ======================================================= */
+.main.chat-main { height: 100%; min-height: 0; overflow: hidden; }
 .chat-main { display: flex; flex-direction: column; height: 100%; min-height: 0; width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
 .chat-main > * { min-width: 0; max-width: 100%; }
 .chat-main > .section-menu { flex: 0 0 auto; }
