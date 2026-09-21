@@ -112,7 +112,13 @@ export async function render(main) {
     ['recent', 'Laatst gewijzigd'], ['name', 'Naam A-Z'], ['producer', 'Producent A-Z'], ['vintage', 'Jaargang oud → jong'], ['vintageDesc', 'Jaargang jong → oud'],
     ['rating', 'Beoordeling'], ['bottles', 'Aantal flessen'], ['drink', 'Drinken vóór'], ['price', 'Prijs hoog → laag'],
   ], { value: f.sort, 'aria-label': 'Sorteren' });
-  main.append(el('div', { class: 'toolbar' }, search, sortSel, filterBtn));
+  const viewToggle = el('div', { class: 'view-toggle', role: 'group', 'aria-label': 'Weergave' });
+  const viewKey = 'wijnkelder.cellar-view';
+  let view = (() => { try { return sessionStorage.getItem(viewKey) === 'list' ? 'list' : 'cards'; } catch { return 'cards'; } })();
+  const cardsBtn = el('button', { class: 'btn ghost sm', type: 'button', text: '▦ Kaarten', 'aria-pressed': view === 'cards' });
+  const listBtn = el('button', { class: 'btn ghost sm', type: 'button', text: '☷ Lijst', 'aria-pressed': view === 'list' });
+  viewToggle.append(cardsBtn, listBtn);
+  main.append(el('div', { class: 'toolbar modern-cellar-toolbar' }, search, sortSel, filterBtn, viewToggle));
 
   // Type-chips
   const chips = el('div', { class: 'chips', style: { marginBottom: '0.8rem' } });
@@ -163,6 +169,9 @@ export async function render(main) {
     sessionStorage.setItem(FILTER_KEY, JSON.stringify(f));
     const list = applyFilters(wines, f);
     clear(grid);
+    grid.classList.toggle('cellar-list', view === 'list');
+    cardsBtn.setAttribute('aria-pressed', String(view === 'cards'));
+    listBtn.setAttribute('aria-pressed', String(view === 'list'));
     const bottles = list.reduce((s, w) => s + w.bottles_in_cellar, 0);
     const value = list.reduce((s, w) => s + (w.cellar_value || 0), 0);
     const est = list.reduce((s, w) => s + (w.estimated_value || 0), 0);
@@ -173,6 +182,13 @@ export async function render(main) {
     }
     for (const w of list) grid.append(wineCard(w));
   }
+  function setView(next) {
+    view = next;
+    try { sessionStorage.setItem(viewKey, view); } catch { /* optioneel */ }
+    update();
+  }
+  cardsBtn.addEventListener('click', () => setView('cards'));
+  listBtn.addEventListener('click', () => setView('list'));
   const debounced = debounce(update, 150);
   search.addEventListener('input', debounced);
   for (const c of [sortSel, country, region, grape, location, vMin, vMax, pMin, pMax, aging, status, gifted.input, fav.input, showEmpty.input]) c.addEventListener('change', update);

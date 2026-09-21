@@ -11,7 +11,7 @@ const year = new Date().getFullYear();
 export async function render(main, { params, navigate }) {
   const id = params[0];
   let data = await api.get(`/api/wines/${id}`);
-  const root = el('div');
+  const root = el('div', { class: 'wine-detail-page' });
   main.append(root);
 
   async function reload() {

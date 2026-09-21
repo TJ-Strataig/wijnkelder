@@ -100,7 +100,7 @@ async function singleView(main, { params, mode, navigate }) {
   if (editing) existing = (await api.get(`/api/wines/${params[0]}`)).wine;
 
   if (editing) main.append(el('h1', { text: `Bewerken — ${existing.name}` }));
-  const wrap = el('div', { class: 'stack' });
+  const wrap = el('div', { class: 'stack add-wizard' });
   main.append(wrap);
 
   const draft = { ...(existing || {}), type: existing?.type || 'rood', grapes: existing?.grapes || [], food_pairings: existing?.food_pairings || [] };

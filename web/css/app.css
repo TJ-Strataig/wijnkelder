@@ -59,6 +59,32 @@ body.design-modern h1, body.design-modern h2, body.design-modern h3,
 body.design-modern .brand span { font-family: var(--font-sans); letter-spacing: -0.01em; }
 body.design-modern .card, body.design-modern .wine-card { box-shadow: var(--shadow); border-color: transparent; }
 body.design-modern .wine-card .thumb img, body.design-modern .label-img { object-fit: contain; }
+body.design-modern .topbar {
+  background: var(--paper); color: var(--ink); border-bottom: 1px solid var(--line);
+  box-shadow: 0 2px 12px rgba(53, 21, 45, 0.06);
+}
+body.design-modern .brand { color: var(--bordeaux-deep); font-weight: 750; }
+body.design-modern .sidenav a { color: var(--muted); }
+body.design-modern .sidenav a.active { color: var(--bordeaux); background: var(--gold-soft); }
+body.design-modern .icon-btn { color: var(--bordeaux); }
+body.design-modern .main { max-width: 1280px; }
+body.design-modern .modern-cellar-toolbar { background: var(--paper); padding: 0.65rem; border-radius: 14px; }
+body.design-modern .view-toggle { display: flex; gap: 0.35rem; margin-left: auto; }
+body.design-modern .view-toggle .btn[aria-pressed="true"] { background: var(--bordeaux); color: #fff; border-color: var(--bordeaux); }
+body.design-modern .cellar-list { display: flex; flex-direction: column; gap: 0.55rem; }
+body.design-modern .cellar-list .wine-card { display: grid; grid-template-columns: 88px minmax(0, 1fr); min-height: 88px; }
+body.design-modern .cellar-list .wine-card .thumb { aspect-ratio: auto; height: 100%; min-height: 88px; }
+body.design-modern .cellar-list .wine-card .body { justify-content: center; padding: 0.7rem 1rem; }
+body.design-modern .cellar-list .wine-card h3 { font-size: 1.05rem; }
+body.design-modern .wine-detail-page .detail-hero { background: var(--paper); border-radius: 20px; padding: clamp(0.8rem, 3vw, 1.5rem); }
+body.design-modern .wine-detail-page .label-img { border-radius: 14px; }
+body.design-modern .add-wizard > .card { border-left: 4px solid var(--gold); }
+body.design-modern .dropzone { border-style: solid; border-color: var(--line); transition: border-color .15s, background .15s; }
+body.design-modern .dropzone:hover, body.design-modern .dropzone:focus { border-color: var(--gold); background: var(--gold-soft); }
+body.design-modern .tonight-page > h1 { font-size: clamp(2rem, 5vw, 3rem); margin-bottom: .15rem; }
+body.design-modern .tonight-page .tabs { background: var(--paper); border: 0; border-radius: 14px; padding: .25rem; gap: .2rem; }
+body.design-modern .tonight-page .tabs button { border: 0; border-radius: 10px; }
+body.design-modern .tonight-page .tabs button.active { background: var(--bordeaux); color: #fff; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

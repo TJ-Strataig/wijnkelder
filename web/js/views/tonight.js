@@ -8,6 +8,7 @@ import { renderDishMatches, renderPairingAdvice, renderByWine } from './pairing.
 const ROLE = { veilig: ['🎯', 'Veilige keuze', 'ok'], verrassing: ['🎲', 'Verrassing', 'gold'], 'nu-open': ['⏳', 'Nu openen', 'warn'] };
 
 export async function render(main, { query = new URLSearchParams() } = {}) {
+  main.classList.add('tonight-page');
   main.append(el('h1', { text: 'Vanavond' }), el('p', { class: 'muted', text: 'Spijs & wijn, een fles voor de avond of advies in het restaurant — alles op één plek.' }));
   const tabs = el('div', { class: 'tabs' });
   const body = el('div');
