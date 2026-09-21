@@ -61,7 +61,7 @@ a { color: var(--bordeaux-light); }
 .grow { flex: 1; }
 
 /* Layout */
-.app { display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); min-height: 100dvh; width: 100%; max-width: 100%; }
+.app { display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); min-height: 100dvh; width: 100%; max-width: 100%; }
 .topbar {
   display: flex; align-items: center; gap: 1rem; padding: 0.6rem 1rem;
   background: linear-gradient(135deg, var(--bordeaux-deep), var(--bordeaux));
@@ -90,6 +90,8 @@ a { color: var(--bordeaux-light); }
 [data-theme="dark"] .bottomnav a.active { color: var(--gold); }
 .bottomnav .ico { font-size: 1.25rem; line-height: 1; }
 .main { padding: 1rem; max-width: 1200px; width: 100%; margin: 0 auto; padding-bottom: 2rem; min-width: 0; overflow-x: hidden; }
+body.chat-active .app { height: 100dvh; min-height: 0; overflow: hidden; }
+.main.chat-main { min-height: 0; }
 .main > *, .main .card, .main .grid, .main .stack, .main .form-grid, .main .tabs, .main .toolbar { max-width: 100%; min-width: 0; }
 @media (min-width: 900px) {
   .sidenav { display: flex; }
@@ -417,7 +419,7 @@ a[href^="http"], code { overflow-wrap: anywhere; }
 }
 
 /* ===== Sommelier-chat ======================================================= */
-.main.chat-main { height: 100%; min-height: 0; overflow: hidden; }
+.main.chat-main { height: 100%; overflow: hidden; }
 .chat-main { display: flex; flex-direction: column; height: 100%; min-height: 0; width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
 .chat-main > * { min-width: 0; max-width: 100%; }
 .chat-main > .section-menu { flex: 0 0 auto; }
