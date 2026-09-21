@@ -2,6 +2,7 @@
 import { el, clear, field, input, select, checkbox, modal, confirmDialog, toast, fmtDateTime, download } from '../util.js';
 import { api, session } from '../api.js';
 import { addPasskey, logout, deviceLabel } from '../auth.js';
+import { getDesign, setDesign } from '../design.js';
 import { renderTabs } from '../tabs.js';
 import { render as renderAdmin } from './admin.js';
 
@@ -19,6 +20,17 @@ export async function render(main, context) {
 async function personalView(main, { navigate }) {
   const user = session.user;
   main.append(el('p', { class: 'muted', text: `Ingelogd als ${user?.name} (${user?.role === 'admin' ? 'beheerder' : 'lid'})` }));
+
+  const design = el('div', { class: 'card' });
+  const designSelect = select([['modern', 'Modern'], ['classic', 'Klassiek']], { value: getDesign() });
+  design.append(el('h2', { style: { marginTop: 0 }, text: 'Jouw ontwerp' }),
+    el('p', { class: 'small muted', text: 'De keuze geldt alleen voor deze browser en verandert geen wijngegevens. Sla eerst onafgemaakte invoer op voordat je wisselt.' }),
+    field('Ontwerp', designSelect));
+  designSelect.addEventListener('change', () => {
+    const mode = setDesign(designSelect.value);
+    toast(`${mode === 'modern' ? 'Modern' : 'Klassiek'} ontwerp actief`, 'ok');
+  });
+  main.append(design);
 
   // Passkeys
   const pk = el('div', { class: 'card' });

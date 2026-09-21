@@ -88,7 +88,9 @@ export async function render(main) {
 
   const head = el('div', { class: 'row between' },
     el('div', {}, el('h1', { text: 'Onze kelder' }), el('div', { class: 'muted small', text: `${totalBottles} flessen · ${inCellar.length} verschillende wijnen` })),
-    el('a', { class: 'btn gold', href: '#/toevoegen', text: '＋ Wijn toevoegen' }));
+    el('div', { class: 'row' },
+      el('a', { class: 'btn secondary', href: '#/toevoegen?tab=friends', text: '📷 Bij vrienden gedronken' }),
+      el('a', { class: 'btn gold', href: '#/toevoegen', text: '＋ Wijn toevoegen' })));
   main.append(head);
 
   // Waarde van de collectie: betaald én geschat (incl. prijsindicatie voor gekregen flessen)

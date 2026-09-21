@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { session } from './api.js';
 import { logout } from './auth.js';
 import { invalidateWines } from './data.js';
+import { applyDesign, getDesign, toggleDesign } from './design.js';
 import * as login from './views/login.js';
 import * as cellar from './views/cellar.js';
 import * as wine from './views/wine.js';
@@ -109,6 +110,14 @@ async function refreshBell() {
   } catch { /* stil */ }
 }
 window.addEventListener('DOMContentLoaded', () => {
+  applyDesign();
+  const designToggle = document.getElementById('design-toggle');
+  designToggle?.addEventListener('click', () => {
+    const mode = toggleDesign();
+    designToggle.title = mode === 'modern' ? 'Klassiek ontwerp gebruiken' : 'Modern ontwerp gebruiken';
+    designToggle.setAttribute('aria-label', designToggle.title);
+    toast(mode === 'modern' ? 'Modern ontwerp actief' : 'Klassiek ontwerp actief', 'ok');
+  });
   const bell = document.getElementById('bell');
   bell?.addEventListener('click', async () => {
     const { notifications } = await api.get('/api/notifications');
@@ -190,6 +199,7 @@ function initTheme() {
 window.addEventListener('hashchange', render);
 window.addEventListener('wk:logout', () => { invalidateWines(); navigate('/login'); });
 initTheme();
+applyDesign(getDesign());
 render();
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {

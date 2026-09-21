@@ -53,6 +53,8 @@ Dit document beschrijft hoe de app is beveiligd en welke keuzes daarbij zijn gem
 
 ## Ontwikkel- en publicatiecontroles
 
+De ontwerpkeuze Modern/Klassiek staat alleen in de lokale browseropslag. Een opslagfout gebruikt Modern als veilige standaard en raakt geen collectiegegevens. De scanflow **Bij vrienden gedronken** gebruikt dezelfde servervalidatie, authenticatie, duplicate-bewaking en atomische historiehandeling als gewone directe historie-invoer; er wordt geen betaalde aankoopprijs afgeleid uit de scan.
+
 De huidige testset gebruikt Node 24 en `npm ci` met de bestaande lockfile. De 55 tests bestrijken API-regels, releaseselectie en projectintegriteit. Succesvolle registraties worden alleen in het afzonderlijke `registration.test.mjs` gesimuleerd via een modulemock van de WebAuthn-verifier; daarbij worden challenge, origin, RP ID en vereiste gebruikersverificatie gecontroleerd. De beveiligingstests gebruiken de echte verifier en bewaken dat ongeldige registraties geen gebruiker, credential of sessie aanmaken. Productieauthenticatie is hiervoor niet aangepast.
 
 Dit is geen nieuwe volledige beveiligingsreview of biometrische end-to-endproef. De historische reviewbeschrijvingen hieronder zijn geen bewijs van de huidige live versie. Echte apparaatregistratie, de GitHub-publicatieroute en herstel van productiegegevens vereisen afzonderlijke bevestiging.

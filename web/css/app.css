@@ -44,6 +44,24 @@ body {
   -webkit-font-smoothing: antialiased;
   min-height: 100dvh;
 }
+body.design-modern {
+  --bordeaux: #5c2346;
+  --bordeaux-deep: #35152d;
+  --bordeaux-light: #8b4770;
+  --gold: #e89172;
+  --gold-soft: #f5d8cb;
+  --cream: #fbf8f4;
+  --paper: #fffdfb;
+  --line: #eadfdc;
+  --shadow: 0 4px 18px rgba(53, 21, 45, 0.08);
+}
+body.design-modern h1, body.design-modern h2, body.design-modern h3,
+body.design-modern .brand span { font-family: var(--font-sans); letter-spacing: -0.01em; }
+body.design-modern .card, body.design-modern .wine-card { box-shadow: var(--shadow); border-color: transparent; }
+body.design-modern .wine-card .thumb img, body.design-modern .label-img { object-fit: contain; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
 h1, h2, h3, .brand span, .wine-card h3, .hero-title { font-family: var(--font-serif); font-weight: 600; letter-spacing: 0.01em; }
 h1 { font-size: 1.7rem; margin: 0 0 0.5rem; }
 h2 { font-size: 1.3rem; margin: 1.2rem 0 0.6rem; }

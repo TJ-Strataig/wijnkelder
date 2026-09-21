@@ -12,8 +12,86 @@ export async function render(main, context) {
   main.append(el('h1', { text: 'Toevoegen' }));
   return renderTabs(main, { path: '/toevoegen', query: context.query, tabs: [
     { key: 'single', label: 'Eén wijn', render: (body) => singleView(body, context) },
+    { key: 'friends', label: 'Bij vrienden', render: (body) => friendsView(body, context) },
     { key: 'bulk', label: 'Bulk', render: (body) => renderBulk(body, context) },
   ] });
+}
+
+async function friendsView(main, { navigate }) {
+  const draft = { type: 'rood', volume_ml: 750 };
+  let photo = null;
+  let labelKey = null;
+  const file = el('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true });
+  const preview = el('img', { class: 'preview', alt: 'Voorbeeld van het etiket', hidden: true });
+  const status = el('p', { class: 'small muted' });
+  const place = input({ placeholder: 'Bij wie of waar gedronken?', maxlength: 150 });
+  const occasion = input({ placeholder: 'Bijv. diner bij vrienden', maxlength: 200 });
+  const note = input({ placeholder: 'Opmerking', maxlength: 1000 });
+  const name = input({ required: true, placeholder: 'Naam van de wijn' });
+  const producer = input({ placeholder: 'Producent / wijnhuis' });
+  const type = select(Object.entries(TYPE_LABELS), { value: 'rood' });
+  const vintage = el('input', { type: 'number', min: 1800, max: 2100, placeholder: 'Jaargang' });
+  const scan = el('button', { class: 'btn gold', type: 'button', text: '📷 Etiket scannen' });
+  const save = el('button', { class: 'btn gold', type: 'button', text: 'Naar historie opslaan', disabled: true });
+  const card = el('div', { class: 'card stack' },
+    el('h2', { style: { marginTop: 0 }, text: 'Fles bij vrienden gedronken' }),
+    el('p', { class: 'muted', text: 'Scan het etiket van een fles die jullie niet zelf hebben gekocht. De wijn wordt direct als gedronken in de historie gezet en telt niet mee in de kelder.' }),
+    el('div', { class: 'row' }, scan, file),
+    preview,
+    status,
+    el('div', { class: 'form-grid' }, field('Naam *', name), field('Producent', producer), field('Type *', type), field('Jaargang', vintage)),
+    el('fieldset', {}, el('legend', { text: 'Historie' }), field('Waar / bij wie', place), field('Gelegenheid', occasion), field('Opmerking', note)),
+    el('div', { class: 'row', style: { justifyContent: 'flex-end' } }, save));
+  main.append(card);
+
+  file.addEventListener('change', () => { if (file.files[0]) recognize(file.files[0]); file.value = ''; });
+  scan.addEventListener('click', () => file.click());
+  for (const node of [name, producer, type, vintage]) node.addEventListener('input', () => { save.disabled = !name.value.trim(); });
+
+  async function recognize(blob) {
+    scan.disabled = true;
+    status.textContent = 'Etiket verkleinen en herkennen…';
+    try {
+      photo = await shrinkImage(blob, 1600, 0.86);
+      preview.src = photo.dataUrl;
+      preview.hidden = false;
+      const result = await api.post('/api/ai/recognize', { image: photo.dataUrl });
+      Object.assign(draft, Object.fromEntries(Object.entries(result.wine || {}).filter(([k, v]) => v !== null && v !== undefined && !['confidence', 'label_image_key'].includes(k))));
+      name.value = draft.name || '';
+      producer.value = draft.producer || '';
+      type.value = draft.type || 'rood';
+      vintage.value = draft.vintage || '';
+      save.disabled = !name.value.trim();
+      status.textContent = 'Controleer de herkenning en vul waar nodig aan.';
+    } catch (e) {
+      status.textContent = 'Herkenning mislukt. Vul de wijn handmatig in.';
+      toast(e.message, 'error');
+      save.disabled = !name.value.trim();
+    } finally { scan.disabled = false; }
+  }
+
+  save.addEventListener('click', async () => {
+    if (!name.value.trim()) return toast('De naam van de wijn is verplicht', 'error');
+    save.disabled = true;
+    try {
+      if (photo && !labelKey) labelKey = (await api.upload(photo.blob)).key;
+      const wine = { ...draft, name: name.value.trim(), producer: producer.value.trim() || null, type: type.value, vintage: vintage.value ? Number(vintage.value) : null, label_image_key: labelKey };
+      const consumed = { reason: 'consumed', date: new Date().toISOString().slice(0, 10), place: place.value.trim() || null, occasion: occasion.value.trim() || null, note: note.value.trim() || null };
+      let result;
+      try {
+        result = await api.post('/api/wines', { ...wine, quantity: 1, bottle: { size_ml: wine.volume_ml || 750, price: null, gifted: false }, consumed });
+      } catch (e) {
+        if (e.status !== 409 || !e.data?.duplicate) throw e;
+        const choice = await duplicateDialog(e.data.duplicate, { quantity: 1 });
+        if (!choice) { save.disabled = false; return; }
+        if (choice === 'merge') result = await api.post(`/api/wines/${e.data.duplicate.id}/bottles`, { quantity: 1, bottle: { size_ml: wine.volume_ml || 750, price: null, gifted: false }, consumed });
+        else result = await api.post('/api/wines', { ...wine, quantity: 1, bottle: { size_ml: wine.volume_ml || 750, price: null, gifted: false }, consumed, allow_duplicate: true });
+      }
+      invalidateWines();
+      toast('Fles toegevoegd aan de historie', 'ok');
+      navigate(`/wijn/${result.wine.id}`);
+    } catch (e) { toast(e.message, 'error'); save.disabled = false; }
+  });
 }
 
 async function singleView(main, { params, mode, navigate }) {
