@@ -84,7 +84,7 @@ function renderNav(active) {
   const side = document.getElementById('sidenav');
   const bottom = document.getElementById('bottomnav');
   clear(side); clear(bottom);
-  const items = [...NAV.filter((n) => n.path !== '/meer'), { path: '/historie', label: 'Historie', ico: '📜' }, { path: '/inzichten', label: 'Inzichten', ico: '👅' }, { path: '/voorraad', label: 'Voorraad', ico: '🛒' }];
+  const items = [...NAV, { path: '/historie', label: 'Historie', ico: '📜' }, { path: '/inzichten', label: 'Inzichten', ico: '👅' }, { path: '/voorraad', label: 'Voorraad', ico: '🛒' }];
   if (document.body?.classList?.contains('design-modern')) items.splice(1, 0, { path: '/toevoegen', label: 'Toevoegen', ico: '＋' });
   items.push({ path: '/instellingen', label: 'Instellingen', ico: '⚙️' });
   for (const n of items) side.append(el('a', { href: `#${n.path}`, class: active === n.path ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));

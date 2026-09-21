@@ -81,4 +81,5 @@ test('late navigation renders are detached, disposed and cannot redirect the cur
   }
   assert.ok(moreLinks.includes('#/voorraad'));
   assert.ok(moreLinks.includes('#/sommelier'));
+  assert.ok(mainLinks('sidenav').includes('#/meer'));
 });
