@@ -64,7 +64,11 @@ export async function render(main) {
     return out;
   }
 
-  function scroll() { log.scrollTop = log.scrollHeight; }
+  function scroll() {
+    // Wacht op de flex-layout zodat nieuwe berichten ook na een viewport-resize
+    // (bijvoorbeeld wanneer het mobiele toetsenbord opent) volledig zichtbaar zijn.
+    requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
+  }
 
   async function load() {
     clear(log);
