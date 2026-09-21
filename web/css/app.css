@@ -416,8 +416,9 @@ a[href^="http"], code { overflow-wrap: anywhere; }
 }
 
 /* ===== Sommelier-chat ======================================================= */
-.chat-main { display: flex; flex-direction: column; height: calc(100dvh - 60px); min-height: 0; width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
+.chat-main { display: flex; flex-direction: column; height: 100%; min-height: 0; width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
 .chat-main > * { min-width: 0; max-width: 100%; }
+.chat-main > .section-menu { flex: 0 0 auto; }
 .chat-head { flex: 0 0 auto; margin-bottom: 0.5rem; flex-wrap: wrap; }
 .chat-head h1 { font-size: 1.4rem; }
 .chat-log { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 0.6rem; padding: 0.5rem 0.2rem; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
