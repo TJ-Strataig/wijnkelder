@@ -10,6 +10,7 @@ import * as insights from './insights.js';
 import * as som from './sommelier.js';
 import * as agent from './agent.js';
 import * as producers from './producers.js';
+import * as selections from './selections.js';
 
 const routes = [];
 function route(method, pattern, handler, { auth: needsAuth = true, admin = false } = {}) {
@@ -53,6 +54,14 @@ route('GET',    '/api/stats', wines.stats);
 route('GET',    '/api/wishlist', wines.listWishlist);
 route('POST',   '/api/wishlist', wines.addWishlist);
 route('DELETE', '/api/wishlist/:id', wines.deleteWishlist);
+route('GET',    '/api/selections', selections.listSelections);
+route('POST',   '/api/selections', selections.createSelection);
+route('GET',    '/api/selections/:id', selections.getSelectionDetail);
+route('PATCH',  '/api/selections/:id', selections.renameSelection);
+route('PUT',    '/api/selections/:id', selections.renameSelection);
+route('DELETE', '/api/selections/:id', selections.deleteSelection);
+route('POST',   '/api/selections/:id/wines', selections.addWine);
+route('DELETE', '/api/selections/:id/wines/:wineId', selections.removeWine);
 route('GET',    '/api/export.json', wines.exportAll);
 route('GET',    '/api/export.csv', wines.exportCsv);
 route('POST',   '/api/photos', wines.uploadPhoto);

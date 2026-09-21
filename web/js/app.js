@@ -18,6 +18,7 @@ import * as chat from './views/chat.js';
 import * as insights from './views/insights.js';
 import * as manage from './views/manage.js';
 import * as producers from './views/producers.js';
+import * as selections from './views/selections.js';
 
 const NAV = [
   { path: '/kelder', label: 'Kelder', ico: '🍷' },
@@ -32,6 +33,7 @@ const MENU_GROUPS = [
   { path: '/sommelier', label: 'Sommelier', links: [
     ['/sommelier', 'Chat'], ['/vanavond', 'Vanavond'], ['/verlanglijst', 'Verlanglijst'],
   ] },
+  { path: '/selecties', label: 'Selecties', links: [['/selecties', 'Selecties']] },
 ];
 
 const ROUTES = [
@@ -54,6 +56,8 @@ const ROUTES = [
   { pattern: /^\/instellingen$/, view: settings },
   { pattern: /^\/herkomst$/, view: mapView },
   { pattern: /^\/wijnhuizen$/, view: producers },
+  { pattern: /^\/selecties$/, view: selections },
+  { pattern: /^\/selecties\/([^/]+)$/, view: selections },
   { pattern: /^\/meer$/, view: { render: renderMore } },
 ];
 
@@ -91,6 +95,7 @@ function renderMore(main) {
     ['/sommelier', '🎩', 'De Sommelier', 'Chat, Vanavond: spijs & wijn, restaurantadvies en verlanglijst'],
     ['/inzichten', '👅', 'Inzichten', 'Smaakprofielen, prijs-kwaliteit, jaaroverzicht en statistieken'],
     ['/voorraad', '🛒', 'Voorraad', 'Aankooplijst, inventarisatie, cadeaus, herkomst en wijnhuizen'],
+    ['/selecties', '🍷', 'Selecties', 'Bewaar lijsten van wijnen voor een diner, thema of proeverij'],
     ['/instellingen', '⚙️', 'Instellingen', user?.role === 'admin' ? 'Passkeys, app, export en huishoudbeheer' : 'Passkeys, app en export'],
   ].filter(Boolean);
   main.append(el('h1', { text: 'Meer' }), el('div', { class: 'stack' }, links.map(([p, ico, t, d]) =>
