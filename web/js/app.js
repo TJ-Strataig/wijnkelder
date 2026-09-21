@@ -19,6 +19,7 @@ import * as insights from './views/insights.js';
 import * as manage from './views/manage.js';
 import * as producers from './views/producers.js';
 import * as selections from './views/selections.js';
+import * as evenings from './views/evenings.js';
 
 const NAV = [
   { path: '/kelder', label: 'Kelder', ico: '🍷' },
@@ -34,6 +35,7 @@ const MENU_GROUPS = [
     ['/sommelier', 'Chat'], ['/vanavond', 'Vanavond'], ['/verlanglijst', 'Verlanglijst'],
   ] },
   { path: '/selecties', label: 'Selecties', links: [['/selecties', 'Selecties']] },
+  { path: '/avonden', label: 'Avondplanning', links: [['/avonden', 'Avonden']] },
 ];
 
 const ROUTES = [
@@ -58,6 +60,8 @@ const ROUTES = [
   { pattern: /^\/wijnhuizen$/, view: producers },
   { pattern: /^\/selecties$/, view: selections },
   { pattern: /^\/selecties\/([^/]+)$/, view: selections },
+  { pattern: /^\/avonden$/, view: evenings },
+  { pattern: /^\/avonden\/([^/]+)$/, view: evenings },
   { pattern: /^\/meer$/, view: { render: renderMore } },
 ];
 
@@ -96,6 +100,7 @@ function renderMore(main) {
     ['/inzichten', '👅', 'Inzichten', 'Smaakprofielen, prijs-kwaliteit, jaaroverzicht en statistieken'],
     ['/voorraad', '🛒', 'Voorraad', 'Aankooplijst, inventarisatie, cadeaus, herkomst en wijnhuizen'],
     ['/selecties', '🍷', 'Selecties', 'Bewaar lijsten van wijnen voor een diner, thema of proeverij'],
+    ['/avonden', '🌙', 'Avondplanning', 'Plan diners, restaurantbezoeken en wijnselecties'],
     ['/instellingen', '⚙️', 'Instellingen', user?.role === 'admin' ? 'Passkeys, app, export en huishoudbeheer' : 'Passkeys, app en export'],
   ].filter(Boolean);
   main.append(el('h1', { text: 'Meer' }), el('div', { class: 'stack' }, links.map(([p, ico, t, d]) =>

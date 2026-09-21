@@ -11,6 +11,7 @@ import * as som from './sommelier.js';
 import * as agent from './agent.js';
 import * as producers from './producers.js';
 import * as selections from './selections.js';
+import * as evenings from './evenings.js';
 
 const routes = [];
 function route(method, pattern, handler, { auth: needsAuth = true, admin = false } = {}) {
@@ -62,6 +63,11 @@ route('PUT',    '/api/selections/:id', selections.renameSelection);
 route('DELETE', '/api/selections/:id', selections.deleteSelection);
 route('POST',   '/api/selections/:id/wines', selections.addWine);
 route('DELETE', '/api/selections/:id/wines/:wineId', selections.removeWine);
+route('GET',    '/api/evenings', evenings.listEvenings);
+route('POST',   '/api/evenings', evenings.createEvening);
+route('GET',    '/api/evenings/:id', evenings.getEveningDetail);
+route('PATCH',  '/api/evenings/:id', evenings.updateEvening);
+route('DELETE', '/api/evenings/:id', evenings.deleteEvening);
 route('GET',    '/api/export.json', wines.exportAll);
 route('GET',    '/api/export.csv', wines.exportCsv);
 route('POST',   '/api/photos', wines.uploadPhoto);

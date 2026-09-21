@@ -40,7 +40,8 @@ export async function render(main, { query = new URLSearchParams() } = {}) {
 }
 
 function homeView(body) {
-  body.append(el('p', { class: 'muted small', text: 'Kies of typ een gerecht voor directe spijs-wijnmatches uit jullie kelder. De huissommelier combineert het gerecht en jullie stemming met scores, drinkvensters en wat jullie recent dronken: een veilige keuze, een verrassing en iets dat nu open moet. Ook zonder gerecht kun je avondadvies vragen.' }));
+  body.append(el('p', { class: 'muted small', text: 'Kies of typ een gerecht voor directe spijs-wijnmatches uit jullie kelder. De huissommelier combineert het gerecht en jullie stemming met scores, drinkvensters en wat jullie recent dronken: een veilige keuze, een verrassing en iets dat nu open moet. Ook zonder gerecht kun je avondadvies vragen.' }),
+    el('a', { class: 'btn secondary sm', href: '#/avonden', text: '🌙 Bewaar als avond' }));
   const dishSel = el('select', { 'aria-label': 'Kies een gerecht' }, el('option', { value: '', text: '— kies een gerecht (optioneel) —' }));
   for (const group of DISH_GROUPS) {
     dishSel.append(el('optgroup', { label: group }, DISHES.filter((d) => d.group === group).map((d) => el('option', { value: d.id, text: d.name }))));
