@@ -5,6 +5,7 @@ import {
   HttpError, json, noContent, readJson, uuid, nowIso, str, num, bool, strArray, oneOf, isoDate, quantity,
   WINE_TYPES, BOTTLE_REMOVE_REASONS, signPhotoUrl, verifyPhotoSig, isValidPhotoKey, safeHttpsUrl, logActivity, SECURITY_HEADERS,
 } from './util.js';
+import { validateSlot } from './locations.js';
 
 // Fotosleutel uit invoer: alleen exact formaat, en de foto moet echt bestaan in de opslag.
 async function photoKeyFromBody(env, v) {
@@ -100,7 +101,7 @@ function wineFields(body) {
   };
 }
 
-function bottleFields(body) {
+async function bottleFields(env, body) {
   return {
     size_ml: num(body.size_ml, { min: 50, max: 30000, int: true, name: 'Inhoud' }) ?? 750,
     price: num(body.price, { min: 0, max: 1e6, name: 'Prijs' }),
@@ -110,6 +111,7 @@ function bottleFields(body) {
     purchase_date: isoDate(body.purchase_date, { name: 'Aankoopdatum' }),
     purchase_place: str(body.purchase_place, { max: 150 }),
     location: str(body.location, { max: 120 }),
+    slot_id: await validateSlot(env, body.slot_id),
   };
 }
 
@@ -142,14 +144,17 @@ export async function getWine(req, env, { params }) {
   const w = await env.DB.prepare(`${WINE_LIST_SQL} WHERE w.id = ?`).bind(params.id).first();
   if (!w) throw new HttpError(404, 'Wijn niet gevonden.');
   const bottles = (await env.DB.prepare(
-    `SELECT b.*, ua.name AS added_by_name, ur.name AS removed_by_name
-     FROM bottles b LEFT JOIN users ua ON ua.id = b.added_by LEFT JOIN users ur ON ur.id = b.removed_by
+    `SELECT b.*, ua.name AS added_by_name, ur.name AS removed_by_name,
+      s.name AS slot_name, r.name AS rack_name, l.name AS location_name,
+      l.id AS cellar_location_id, r.id AS rack_id
+    FROM bottles b LEFT JOIN users ua ON ua.id = b.added_by LEFT JOIN users ur ON ur.id = b.removed_by
+    LEFT JOIN slots s ON s.id=b.slot_id LEFT JOIN racks r ON r.id=s.rack_id LEFT JOIN cellar_locations l ON l.id=r.location_id
      WHERE b.wine_id = ? ORDER BY b.status = 'in_cellar' DESC, b.added_at DESC`
   ).bind(params.id).all()).results;
   const tastings = (await env.DB.prepare(
     `SELECT t.*, u.name AS user_name FROM tasting_notes t JOIN users u ON u.id = t.user_id WHERE t.wine_id = ? ORDER BY t.tasted_at DESC`
   ).bind(params.id).all()).results;
-  return json({ wine: await decorateWine(env, w), bottles: bottles.map((b) => ({ ...b, gifted: !!b.gifted })), tastings: tastings.map((t) => ({ ...t, would_buy_again: t.would_buy_again === null ? null : !!t.would_buy_again })) });
+  return json({ wine: await decorateWine(env, w), bottles: bottles.map((b) => ({ ...b, gifted: !!b.gifted, location_structured: b.slot_id ? { location_id:b.cellar_location_id, location_name:b.location_name, rack_id:b.rack_id, rack_name:b.rack_name, slot_id:b.slot_id, slot_name:b.slot_name } : null })), tastings: tastings.map((t) => ({ ...t, would_buy_again: t.would_buy_again === null ? null : !!t.would_buy_again })) });
 }
 
 // Normaliseert een tekst voor vergelijking: kleine letters, geen accenten, geen leestekens, geen dubbele spaties.
@@ -218,7 +223,7 @@ export async function createWine(req, env, { user, writes = mutation(env), compl
 
   // Flessen direct meenemen (aantal + aankoopgegevens), in de kelder of — met "consumed" — direct in de historie.
   const qty = quantity(body.quantity) ?? 1;
-  const bf = bottleFields(body.bottle || body);
+  const bf = await bottleFields(env, body.bottle || body);
   const consumed = consumedFields(body.consumed);
   if (consumed && qty === 0) throw new HttpError(400, 'Een gedronken wijn moet minstens een fles hebben.');
   const bottleIds = insertBottles(writes, user, id, qty, bf, consumed);
@@ -301,7 +306,7 @@ export async function addBottles(req, env, { user, params, writes = mutation(env
   if (!w) throw new HttpError(404, 'Wijn niet gevonden.');
   const body = await readJson(req, 50_000);
   const qty = quantity(body.quantity, { min: 1 }) ?? 1;
-  const bf = bottleFields(body);
+  const bf = await bottleFields(env, body);
   const consumed = consumedFields(body.consumed);
   const ids = insertBottles(writes, user, w.id, qty, bf, consumed);
   if (consumed && body.consumed.tasting) insertTasting(writes, user, w.id, ids[0], { ...body.consumed.tasting, tasted_at: body.consumed.tasting.tasted_at || consumed.date, occasion: body.consumed.tasting.occasion || consumed.occasion });
@@ -316,10 +321,10 @@ export async function updateBottle(req, env, { user, params }) {
   const b = await env.DB.prepare('SELECT * FROM bottles WHERE id = ?').bind(params.bottleId).first();
   if (!b) throw new HttpError(404, 'Fles niet gevonden.');
   const body = await readJson(req, 20_000);
-  const bf = bottleFields({ ...b, ...body, gifted: body.gifted === undefined ? b.gifted : body.gifted });
+  const bf = await bottleFields(env, { ...b, ...body, gifted: body.gifted === undefined ? b.gifted : body.gifted });
   await env.DB.prepare(
-    'UPDATE bottles SET size_ml = ?, price = ?, currency = ?, gifted = ?, gifted_from = ?, purchase_date = ?, purchase_place = ?, location = ? WHERE id = ?'
-  ).bind(bf.size_ml, bf.price, bf.currency, bf.gifted, bf.gifted_from, bf.purchase_date, bf.purchase_place, bf.location, b.id).run();
+    'UPDATE bottles SET size_ml = ?, price = ?, currency = ?, gifted = ?, gifted_from = ?, purchase_date = ?, purchase_place = ?, location = ?, slot_id = ? WHERE id = ?'
+  ).bind(bf.size_ml, bf.price, bf.currency, bf.gifted, bf.gifted_from, bf.purchase_date, bf.purchase_place, bf.location, bf.slot_id, b.id).run();
   await env.DB.prepare('UPDATE wines SET updated_at = ? WHERE id = ?').bind(nowIso(), b.wine_id).run();
   return getWine(req, env, { params: { id: b.wine_id } });
 }

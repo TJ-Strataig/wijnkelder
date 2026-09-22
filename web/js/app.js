@@ -21,6 +21,7 @@ import * as producers from './views/producers.js';
 import * as selections from './views/selections.js';
 import * as evenings from './views/evenings.js';
 import * as blindTastings from './views/blindTastings.js';
+import * as locations from './views/locations.js';
 
 const NAV = [
   { path: '/kelder', label: 'Kelder', ico: '🍷' },
@@ -51,6 +52,7 @@ const ROUTES = [
   { pattern: /^\/sommelier$/, view: chat },
   { pattern: /^\/inzichten$/, view: insights },
   { pattern: /^\/voorraad$/, view: manage },
+  { pattern: /^\/rekken$/, view: locations },
   { pattern: /^\/wijn\/([^/]+)\/bewerken$/, view: add, mode: 'edit' },
   { pattern: /^\/historie$/, view: history },
   { pattern: /^\/spijs$/, view: tonight },
@@ -103,6 +105,7 @@ function renderMore(main) {
     ['/sommelier', '🎩', 'De Sommelier', 'Chat, Vanavond: spijs & wijn, restaurantadvies en verlanglijst'],
     ['/inzichten', '👅', 'Inzichten', 'Smaakprofielen, prijs-kwaliteit, jaaroverzicht en statistieken'],
     ['/voorraad', '🛒', 'Voorraad', 'Aankooplijst, inventarisatie, cadeaus, herkomst en wijnhuizen'],
+    ['/rekken', '🗄️', 'Rekken & vakken', 'Locaties, rekken, vakken en bezetting'],
     ['/selecties', '🍷', 'Selecties', 'Bewaar lijsten van wijnen voor een diner, thema of proeverij'],
     ['/avonden', '🌙', 'Avondplanning', 'Plan diners, restaurantbezoeken en wijnselecties'],
     ['/blindproeven', '🕵️', 'Blindproeven', 'Organiseer een blindproeverij en verzamel anonieme proefnotities'],

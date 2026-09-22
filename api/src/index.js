@@ -13,6 +13,7 @@ import * as producers from './producers.js';
 import * as selections from './selections.js';
 import * as evenings from './evenings.js';
 import * as blindTastings from './blindTastings.js';
+import * as locations from './locations.js';
 
 const routes = [];
 function route(method, pattern, handler, { auth: needsAuth = true, admin = false } = {}) {
@@ -38,6 +39,18 @@ route('POST',   '/api/auth/passkeys/verify', auth.addPasskeyVerify);
 route('DELETE', '/api/auth/passkeys/:id', auth.deleteMyPasskey);
 
 route('GET',    '/api/wines', wines.listWines);
+route('GET',    '/api/locations', locations.listLocations);
+route('POST',   '/api/locations', locations.createLocation);
+route('PUT',    '/api/locations/:id', locations.updateLocation);
+route('DELETE', '/api/locations/:id', locations.deleteLocation);
+route('POST',   '/api/locations/:locationId/racks', locations.createRack);
+route('PUT',    '/api/racks/:id', locations.updateRack);
+route('DELETE', '/api/racks/:id', locations.deleteRack);
+route('POST',   '/api/racks/:rackId/slots', locations.createSlot);
+route('PUT',    '/api/slots/:id', locations.updateSlot);
+route('DELETE', '/api/slots/:id', locations.deleteSlot);
+route('GET',    '/api/occupancy', locations.occupancy);
+route('GET',    '/api/locations/legacy', locations.legacyLocations);
 route('POST',   '/api/wines', wines.createWine);
 route('POST',   '/api/wines/check-duplicate', wines.checkDuplicate);
 route('GET',    '/api/wines/:id', wines.getWine);

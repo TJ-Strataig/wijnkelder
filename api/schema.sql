@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS bottles (
   purchase_date   TEXT,
   purchase_place  TEXT,
   location        TEXT,                    -- bijv. "Kelder rek A, plank 2"
+  slot_id         TEXT REFERENCES slots(id) ON DELETE SET NULL,
   added_by        TEXT REFERENCES users(id),
   added_at        TEXT NOT NULL DEFAULT (datetime('now')),
   removed_by      TEXT REFERENCES users(id),
@@ -132,6 +133,30 @@ CREATE TABLE IF NOT EXISTS bottles (
 );
 CREATE INDEX IF NOT EXISTS idx_bottles_wine ON bottles(wine_id);
 CREATE INDEX IF NOT EXISTS idx_bottles_status ON bottles(status);
+
+CREATE TABLE IF NOT EXISTS cellar_locations (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_by TEXT REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (name COLLATE NOCASE)
+);
+CREATE TABLE IF NOT EXISTS racks (
+  id TEXT PRIMARY KEY,
+  location_id TEXT NOT NULL REFERENCES cellar_locations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (location_id, name COLLATE NOCASE)
+);
+CREATE TABLE IF NOT EXISTS slots (
+  id TEXT PRIMARY KEY,
+  rack_id TEXT NOT NULL REFERENCES racks(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (rack_id, name COLLATE NOCASE)
+);
+CREATE INDEX IF NOT EXISTS idx_racks_location ON racks(location_id);
+CREATE INDEX IF NOT EXISTS idx_slots_rack ON slots(rack_id);
 
 CREATE TABLE IF NOT EXISTS tasting_notes (
   id               TEXT PRIMARY KEY,
