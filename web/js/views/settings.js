@@ -186,10 +186,32 @@ async function personalView(main, { navigate }) {
 
   // Export
   const ex = el('div', { class: 'card' });
-  ex.append(el('h2', { style: { marginTop: 0 }, text: 'Gegevens exporteren' }), el('p', { class: 'small muted', text: 'Jullie data is van jullie. Download een volledige kopie (JSON) of een spreadsheet-vriendelijke lijst (CSV, te openen in Excel).' }));
+  ex.append(el('h2', { style: { marginTop: 0 }, text: 'Gegevens exporteren' }), el('p', { class: 'small muted', text: 'Jullie data is van jullie. Kies onderdelen of maak een volledige kopie. Persoonsgegevens worden standaard weggelaten; alleen beheerders kunnen gebruikersgegevens exporteren.' }));
+  const exportKinds = [
+    ['wines', 'Wijnen'], ['bottles', 'Flessen'], ['tasting_notes', 'Proefnotities'], ['wishlist', 'Wensenlijst'],
+    ['selections', 'Selecties'], ['evenings', 'Avonden'], ['blind_tastings', 'Blindproeven'],
+    ['cellar_locations', 'Rekken en vakken'], ['occupancy', 'Bezetting'],
+  ];
+  const checks = exportKinds.map(([value, label]) => checkbox(label, { value, checked: true }));
+  const selectionId = input({ placeholder: 'Optioneel selectie-ID', maxlength: 80 });
+  const eveningId = input({ placeholder: 'Optioneel avond-ID', maxlength: 80 });
+  const blindId = input({ placeholder: 'Optioneel blindproef-ID', maxlength: 80 });
+  const locationId = input({ placeholder: 'Optioneel locatie-ID', maxlength: 80 });
+  ex.append(el('div', { class: 'row', style: { gap: '0.5rem', flexWrap: 'wrap' } }, ...checks.map((c) => c.wrap)));
+  ex.append(el('div', { class: 'row', style: { gap: '0.5rem', flexWrap: 'wrap' } },
+    field('Filter selectie', selectionId), field('Filter avond', eveningId), field('Filter blindproef', blindId), field('Filter locatie', locationId)));
+  const exportUrl = (format) => {
+    const selected = checks.filter((c) => c.input.checked).map((c) => c.input.value);
+    const q = new URLSearchParams({ include: selected.join(',') });
+    if (selectionId.value) q.set('selection_id', selectionId.value);
+    if (eveningId.value) q.set('evening_id', eveningId.value);
+    if (blindId.value) q.set('blind_tasting_id', blindId.value);
+    if (locationId.value) q.set('location_id', locationId.value);
+    return `/api/export.${format}?${q}`;
+  };
   ex.append(el('div', { class: 'row' },
-    el('button', { class: 'btn secondary sm', type: 'button', text: 'Download CSV', onClick: async () => { const r = await api.download('/api/export.csv'); download('wijnkelder.csv', await r.blob()); } }),
-    el('button', { class: 'btn secondary sm', type: 'button', text: 'Download JSON (volledige back-up)', onClick: async () => { const r = await api.download('/api/export.json'); download(`wijnkelder-backup-${new Date().toISOString().slice(0, 10)}.json`, await r.blob()); } })));
+    el('button', { class: 'btn secondary sm', type: 'button', text: 'Download CSV', onClick: async () => { const r = await api.download(exportUrl('csv')); download('wijnkelder.csv', await r.blob()); } }),
+    el('button', { class: 'btn secondary sm', type: 'button', text: 'Download JSON', onClick: async () => { const r = await api.download(exportUrl('json')); download(`wijnkelder-backup-${new Date().toISOString().slice(0, 10)}.json`, await r.blob()); } })));
   main.append(ex);
 
   // Sessie

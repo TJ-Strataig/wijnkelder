@@ -14,6 +14,7 @@ import * as selections from './selections.js';
 import * as evenings from './evenings.js';
 import * as blindTastings from './blindTastings.js';
 import * as locations from './locations.js';
+import * as exportData from './export.js';
 
 const routes = [];
 function route(method, pattern, handler, { auth: needsAuth = true, admin = false } = {}) {
@@ -92,8 +93,8 @@ route('GET',    '/api/blind-tastings/:id/flight', blindTastings.flight);
 route('GET',    '/api/blind-tastings/:id/results', blindTastings.results);
 route('POST',   '/api/blind-tastings/:id/codes/:code/tasting', blindTastings.upsertEntry);
 route('POST',   '/api/blind-tastings/:id/entries/:code', blindTastings.upsertEntry);
-route('GET',    '/api/export.json', wines.exportAll);
-route('GET',    '/api/export.csv', wines.exportCsv);
+route('GET',    '/api/export.json', exportData.exportAll);
+route('GET',    '/api/export.csv', exportData.exportCsv);
 route('POST',   '/api/photos', wines.uploadPhoto);
 route('DELETE', '/api/photos/:key+', wines.deletePhoto);
 
