@@ -21,6 +21,12 @@ alle leden zien en beheren dezelfde collectie.
 - **Duplicaatbewaking**: voer je een fles in die al in de collectie staat (zelfde wijnhuis, naam, jaargang, type, druiven en inhoud — hoofdletters en accenten tellen niet), dan waarschuwt de app direct tijdens het invullen én blokkeert de server een dubbel record. Je kiest dan: *flessen bijboeken* op de bestaande wijn (meestal), of *toch apart toevoegen* als het echt een andere wijn is. Werkt overal: Toevoegen, bulk en de beoordelingswachtrij. Een andere jaargang of een magnum telt als andere wijn; daarvoor krijg je een zachte hint.
 - Favorieten, eigen notities.
 
+### Ontwerp, routes en mobiele werking
+
+Modern is de standaard en wordt lokaal per browser onthouden; Klassiek blijft beschikbaar als compacte, vertrouwde weergave. Wisselen verandert alleen CSS en navigatie, nooit de collectie of serverdata. Op telefoon en tablet werkt dezelfde hash-router met de onderste navigatie (Kelder, Sommelier, Meer); op desktop verschijnt de zijbalk. Via **Meer** zijn onder meer Voorraad, Herkomst, Wijnhuizen, Selecties, Avondplanning, Blindproeven, Rekken & vakken en Instellingen bereikbaar. Oude routes zoals `#/spijs` en `#/statistieken` verwijzen door naar Vanavond en Inzichten.
+
+De belangrijkste routes zijn `#/kelder`, `#/toevoegen`, `#/bulk`, `#/wijn/:id`, `#/vanavond`, `#/sommelier`, `#/selecties` (en detail), `#/avonden` (en detail), `#/blindproeven` (en detail), `#/rekken`, `#/herkomst`, `#/wijnhuizen`, `#/historie`, `#/inzichten`, `#/voorraad` en `#/instellingen`. De moderne kelder biedt daarnaast een lijstweergave die op kleine schermen prettig scrollt.
+
 **Zoeken & filteren** op naam, producent, land, streek, type (rood / wit / rosé / mousserend / port / dessert / versterkt / oranje), jaargang (van–tot), druivenras, bewaarwijn, drinkvenster-status, gekregen, favoriet, locatie, prijs — en sorteren op naam, jaargang, beoordeling, aantal, "drinken vóór" of prijs.
 
 **Flessen openen & historie**
@@ -36,6 +42,14 @@ alle leden zien en beheren dezelfde collectie.
 - **AI-sommelier**: typ wat je gaat eten en krijg de beste 5 flessen uit de kelder met uitleg en serveertip, rekening houdend met drinkvensters. Op de wijnpagina kan de AI ook gerechten voorstellen.
 - **Avondadvies**: het gerecht en de stemming worden samen gebruikt voor drie flessen: een veilige keuze, een verrassing en iets dat nu open moet. Ook beschikbaar zonder gerecht. AI wordt alleen op verzoek aangeroepen; vaste spijs-wijnmatches niet.
 - Het tabblad **Wat eten we bij deze wijn?** en de **Restaurant**-wijnkaart staan op dezelfde pagina. Invoer en resultaten blijven behouden bij wisselen tussen deze tabbladen.
+
+**Selecties, avondplanning en blindproeven**
+- Onder **Meer → Selecties** bewaar je benoemde wijnlijsten en voeg je wijnen toe of verwijder je ze.
+- Onder **Meer → Avondplanning** plan je diners of restaurantavonden met datum, gasten, gerecht, notities en gekoppelde selectie.
+- Onder **Meer → Blindproeven** maak je een proeverij, koppel je flessen en verzamel je anonieme proefnotities. De onthulling blijft een bewuste handeling.
+
+**Rekken & vakken**
+- Onder **Meer → Rekken & vakken** beheer je rekken en vakken en zie je de bezetting. Een fles kan een precieze locatie krijgen; ontbrekende locaties blijven toegestaan.
 
 **Herkomst & wijnhuizen**
 - **Topografische kaart** (OpenTopoMap, omschakelbaar naar stratenkaart) met een speld per wijn, gekleurd op type en met het aantal flessen. Spelden dicht bij elkaar worden gegroepeerd; tik om in te zoomen. Tik op een speld voor de wijnen op die plek en het wijnhuis.
@@ -200,6 +214,10 @@ Releases lopen na elkaar zonder een lopende release automatisch af te breken. Ee
 
 Dit is **geen atomaire release**: als de API slaagt maar Pages faalt, draait de nieuwe API met de oude website. API-wijzigingen moeten dus achterwaarts compatibel blijven. Migraties worden nooit automatisch uitgevoerd. Verplichte PR-controles/branch protection zijn een afzonderlijke repository-instelling; deze workflows stellen ze niet zelf in.
 
+#### Migratievolgorde en Actions
+
+De uitbreidingen worden in deze vaste volgorde toegepast: `0006_selecties.sql`, daarna `0007_avonden.sql`, daarna `0008_blindproeven.sql` en ten slotte `0009_rekken_vakken.sql`. Controleer vóór elke stap welke migraties al op D1 staan, maak een back-up en voer alleen ontbrekende bestanden één keer uit. GitHub Actions bouwt en controleert alleen; **Actions voert geen automatische database-migraties uit**. Een migratie is een afzonderlijke, handmatig goedgekeurde releasehandeling.
+
 ## Kosten
 - GitHub Pages: gratis.
 - Cloudflare Workers/D1/R2: gratis tier is ruim voldoende voor een huishouden.
@@ -218,6 +236,12 @@ Codepublicatie wist de database en foto's niet, maar dat bewijst niet dat elke w
 De JSON-export bevat collectiegegevens, maar niet de volledige database, passkeys/sessies, instellingen, gesprekken of fotobestanden. Voor volledig herstel zijn afzonderlijke, samenhangende back-ups van **D1**, de **R2-foto's** en veilig beheerde **configuratie en geheimen** nodig. Zonder de oorspronkelijke `SESSION_SECRET` zijn daarmee versleutelde instellingen niet leesbaar. Bewaar zulke back-ups niet in de repository.
 
 Een beschikbare herstelperiode of geslaagde export is nog geen bewezen volledige restore. Verifieer herstel apart in een geisoleerde omgeving; test nooit door productie te overschrijven. Een bereikbaar `/api/health` bevestigt niet dat deze onderdelen in orde zijn.
+
+### Export, privacy en resterende beperkingen
+
+De export onder **Instellingen → Download JSON** is bewust beperkt tot collectie-, fles-, historie- en proefnotitiegegevens. Zij bevat geen passkeys, sessies, AI-sleutels, gesprekken, push-abonnementen of R2-fotobestanden en is dus geen volledige back-up. Deel een export niet onnodig: wijnlocaties, aankoopinformatie, notities en historie kunnen privé zijn. Foto's blijven privé in R2 en worden alleen met tijdelijke ondertekende links geleverd.
+
+De app is responsive en installeerbaar als PWA, maar offline gebruik is beperkt tot de shell; lezen en schrijven van gegevens vereist netwerk en een geldige sessie. Camera-, microfoon- en passkeyondersteuning hangt af van browser en apparaat. Er is geen realtime synchronisatie, geen multi-huishoudenmodus en geen automatische conflictresolutie. AI-herkenning, prijsindicaties en chatadvies kunnen fouten bevatten en vragen altijd menselijke controle; een volledige Cloudflare-restore, productie-passkeytest en atomaire D1/R2-back-up zijn nog niet bewezen.
 
 Stand 18 september 2026: Cloudflare-toegang vanuit GitHub Actions werkt. De geisoleerde publicatieproef (run `35319619418`) heeft met de Actions-secrets een tijdelijke Worker gepubliceerd, de deployment bevestigd en de Worker weer verwijderd. Daarmee zijn Worker-publicatie en verwijdering bewezen, niet een volledige productierelease met D1/R2-bindings, Pages of migraties. De eerder gelezen live API-versie dateert van 11 september, zonder bevestigde koppeling aan een Git-commit. De verwachte 20 tabellen, 219 kolommen en 11 expliciete indexen zijn aanwezig. Op 17 september leverde D1 Time Travel ook een herstelpunt van de vorige dag.
 
