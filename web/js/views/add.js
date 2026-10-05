@@ -1,5 +1,5 @@
 // Wijn toevoegen (via foto of handmatig) en bewerken.
-import { el, clear, field, input, select, checkbox, toast, confirmDialog, TYPE_LABELS, shrinkImage, wineTitle } from '../util.js';
+import { el, clear, field, input, select, checkbox, toast, confirmDialog, TYPE_LABELS, shrinkImage, wineTitle, recognitionCorrections } from '../util.js';
 import { api, photoUrl } from '../api.js';
 import { loadWines, invalidateWines } from '../data.js';
 import { bottleForm, destinationForm, duplicateDialog } from './wine.js';
@@ -21,6 +21,7 @@ async function friendsView(main, { navigate }) {
   const draft = { type: 'rood', volume_ml: 750 };
   let photo = null;
   let labelKey = null;
+  let previousRecognition = null;
   const file = el('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true });
   const preview = el('img', { class: 'preview', alt: 'Voorbeeld van het etiket', hidden: true });
   const status = el('p', { class: 'small muted' });
@@ -32,11 +33,12 @@ async function friendsView(main, { navigate }) {
   const type = select(Object.entries(TYPE_LABELS), { value: 'rood' });
   const vintage = el('input', { type: 'number', min: 1800, max: 2100, placeholder: 'Jaargang' });
   const scan = el('button', { class: 'btn gold', type: 'button', text: '📷 Etiket scannen' });
+  const retryScan = el('button', { class: 'btn secondary sm', type: 'button', text: '✨ Opnieuw herkennen met correcties', hidden: true });
   const save = el('button', { class: 'btn gold', type: 'button', text: 'Naar historie opslaan', disabled: true });
   const card = el('div', { class: 'card stack' },
     el('h2', { style: { marginTop: 0 }, text: 'Fles bij vrienden gedronken' }),
     el('p', { class: 'muted', text: 'Scan het etiket van een fles die jullie niet zelf hebben gekocht. De wijn wordt direct als gedronken in de historie gezet en telt niet mee in de kelder.' }),
-    el('div', { class: 'row' }, scan, file),
+    el('div', { class: 'row' }, scan, retryScan, file),
     preview,
     status,
     el('div', { class: 'form-grid' }, field('Naam *', name), field('Producent', producer), field('Type *', type), field('Jaargang', vintage)),
@@ -48,27 +50,40 @@ async function friendsView(main, { navigate }) {
   scan.addEventListener('click', () => file.click());
   for (const node of [name, producer, type, vintage]) node.addEventListener('input', () => { save.disabled = !name.value.trim(); });
 
-  async function recognize(blob) {
+  async function recognize(blob, retry = false) {
+    const current = { name: name.value.trim(), producer: producer.value.trim() || null, type: type.value, vintage: vintage.value ? Number(vintage.value) : null };
+    const corrections = retry ? recognitionCorrections(current, previousRecognition) : {};
+    if (retry && !Object.keys(corrections).length) {
+      toast('Pas eerst het herkende type of een ander gegeven aan', 'error');
+      return;
+    }
     scan.disabled = true;
+    retryScan.disabled = true;
     status.textContent = 'Etiket verkleinen en herkennen…';
     try {
-      photo = await shrinkImage(blob, 1600, 0.86);
+      if (!retry) photo = await shrinkImage(blob, 1600, 0.86);
       preview.src = photo.dataUrl;
       preview.hidden = false;
-      const result = await api.post('/api/ai/recognize', { image: photo.dataUrl });
-      Object.assign(draft, Object.fromEntries(Object.entries(result.wine || {}).filter(([k, v]) => v !== null && v !== undefined && !['confidence', 'label_image_key'].includes(k))));
+      const result = await api.post('/api/ai/recognize', { image: photo.dataUrl, corrections });
+      previousRecognition = result.wine;
+      for (const [k, v] of Object.entries(result.wine || {})) {
+        if (v !== null && v !== undefined && !['confidence', 'label_image_key'].includes(k) && !Object.hasOwn(corrections, k)) draft[k] = v;
+      }
+      Object.assign(draft, corrections);
       name.value = draft.name || '';
       producer.value = draft.producer || '';
       type.value = draft.type || 'rood';
       vintage.value = draft.vintage || '';
       save.disabled = !name.value.trim();
-      status.textContent = 'Controleer de herkenning en vul waar nodig aan.';
+      retryScan.hidden = false;
+      status.textContent = retry ? 'Opnieuw herkend met je correcties. Controleer de gegevens.' : 'Controleer de herkenning en vul waar nodig aan.';
     } catch (e) {
       status.textContent = 'Herkenning mislukt. Vul de wijn handmatig in.';
       toast(e.message, 'error');
       save.disabled = !name.value.trim();
-    } finally { scan.disabled = false; }
+    } finally { scan.disabled = false; retryScan.disabled = false; }
   }
+  retryScan.addEventListener('click', () => photo && recognize(photo.blob, true));
 
   save.addEventListener('click', async () => {
     if (!name.value.trim()) return toast('De naam van de wijn is verplicht', 'error');
@@ -114,10 +129,11 @@ async function singleView(main, { params, mode, navigate }) {
   const drop = el('div', { class: 'dropzone', tabindex: 0, role: 'button' },
     el('div', { style: { fontSize: '2rem' }, text: '📷' }),
     el('div', { text: 'Tik om een foto te maken of te kiezen' }),
-    el('div', { class: 'muted small', text: 'De AI-sommelier herkent de wijn en vult de gegevens in. Je kunt daarna alles nog aanpassen.' }));
+    el('div', { class: 'muted small', text: 'De AI-sommelier herkent de wijn. Pas een fout gegeven aan en laat de AI opnieuw herkennen met jouw correctie.' }));
   const preview = el('img', { class: 'preview', alt: 'Voorbeeld van het etiket', hidden: !labelPreviewUrl, src: labelPreviewUrl || null });
   const hint = input({ placeholder: 'Optionele aanwijzing voor de AI, bijv. "achteretiket" of "jaargang 2019"', maxlength: 300 });
   const recognizeBtn = el('button', { class: 'btn gold', type: 'button', text: '✨ Herken wijn vanaf foto', disabled: true });
+  const retryRecognizeBtn = el('button', { class: 'btn secondary sm', type: 'button', text: '✨ Opnieuw herkennen met correcties', hidden: true });
   const barcodeBtn = el('button', { class: 'btn secondary', type: 'button', text: '▥ Streepjescode', title: 'Scan de streepjescode op het etiket' });
   barcodeBtn.addEventListener('click', async () => {
     try {
@@ -135,6 +151,7 @@ async function singleView(main, { params, mode, navigate }) {
   });
   const statusLine = el('div', { class: 'small muted' });
   let photo = null; // { blob, dataUrl }
+  let previousRecognition = null;
 
   drop.addEventListener('click', () => fileInput.click());
   drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
@@ -148,6 +165,8 @@ async function singleView(main, { params, mode, navigate }) {
       statusLine.textContent = 'Foto verkleinen…';
       photo = await shrinkImage(file);
       preview.src = photo.dataUrl; preview.hidden = false;
+      previousRecognition = null;
+      retryRecognizeBtn.hidden = true;
       labelKey = null; // nieuwe foto wordt bij opslaan geüpload
       recognizeBtn.disabled = false;
       statusLine.textContent = 'Foto klaar. Herken de wijn of vul de gegevens zelf in.';
@@ -155,26 +174,41 @@ async function singleView(main, { params, mode, navigate }) {
     } catch (e) { toast(e.message, 'error'); }
   }
 
-  async function recognize() {
+  async function recognize(retry = false) {
     if (!photo) return;
-    recognizeBtn.disabled = true; recognizeBtn.textContent = 'Herkennen…';
+    let corrections = {};
+    if (retry) {
+      readForm();
+      corrections = recognitionCorrections(draft, previousRecognition);
+      if (!Object.keys(corrections).length && !hint.value.trim()) {
+        toast('Pas eerst de wijngegevens aan of geef een extra aanwijzing', 'error');
+        return;
+      }
+    }
+    recognizeBtn.disabled = true; retryRecognizeBtn.disabled = true; recognizeBtn.textContent = 'Herkennen…';
     statusLine.textContent = 'De AI-sommelier bekijkt het etiket…';
     try {
-      const { wine } = await api.post('/api/ai/recognize', { image: photo.dataUrl, hint: hint.value || undefined });
-      Object.assign(draft, Object.fromEntries(Object.entries(wine).filter(([k, v]) => v !== null && v !== undefined && k !== 'confidence')));
+      const { wine } = await api.post('/api/ai/recognize', { image: photo.dataUrl, hint: hint.value || undefined, corrections });
+      previousRecognition = wine;
+      for (const [k, v] of Object.entries(wine)) {
+        if (v !== null && v !== undefined && k !== 'confidence' && !Object.hasOwn(corrections, k)) draft[k] = v;
+      }
+      Object.assign(draft, corrections);
       fillForm();
+      retryRecognizeBtn.hidden = false;
       const conf = wine.confidence !== null && wine.confidence !== undefined ? ` (zekerheid ${Math.round(wine.confidence * 100)}%)` : '';
       statusLine.textContent = `Herkend: ${wineTitle(wine)}${conf}. Controleer de gegevens hieronder.`;
-      toast('Wijn herkend — controleer de gegevens', 'ok');
+      toast(retry ? 'Wijn opnieuw herkend met je correcties' : 'Wijn herkend — controleer de gegevens', 'ok');
       await Promise.all([checkDuplicate(), checkProducer()]);
       formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
       statusLine.textContent = '';
       toast(e.message, 'error');
-    } finally { recognizeBtn.disabled = false; recognizeBtn.textContent = '✨ Herken wijn vanaf foto'; }
+    } finally { recognizeBtn.disabled = false; retryRecognizeBtn.disabled = false; recognizeBtn.textContent = '✨ Herken wijn vanaf foto'; }
   }
-  recognizeBtn.addEventListener('click', recognize);
-  photoCard.append(drop, fileInput, preview, el('div', { class: 'row', style: { marginTop: '0.7rem' } }, el('div', { class: 'grow' }, hint), recognizeBtn, editing ? null : barcodeBtn), statusLine);
+  recognizeBtn.addEventListener('click', () => recognize());
+  retryRecognizeBtn.addEventListener('click', () => recognize(true));
+  photoCard.append(drop, fileInput, preview, el('div', { class: 'row', style: { marginTop: '0.7rem' } }, el('div', { class: 'grow' }, hint), recognizeBtn, retryRecognizeBtn, editing ? null : barcodeBtn), statusLine);
   wrap.append(photoCard);
 
   // ---- Stap 2: gegevens -------------------------------------------------------

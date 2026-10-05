@@ -63,6 +63,14 @@ export const TYPE_LABELS = {
 export const TYPE_ICONS = { rood: '🍷', wit: '🥂', rose: '🌸', mousserend: '🍾', port: '🍯', dessert: '🍰', versterkt: '🥃', oranje: '🍊', overig: '🍇' };
 export const REMOVE_REASONS = { consumed: 'Gedronken', gifted_away: 'Weggegeven', sold: 'Verkocht', damaged: 'Kurk / beschadigd', other: 'Anders' };
 
+export function recognitionCorrections(current, previous) {
+  const fields = ['name', 'producer', 'country', 'region', 'appellation', 'type', 'vintage', 'grapes'];
+  return Object.fromEntries(fields
+    .filter((key) => current[key] !== null && current[key] !== undefined && current[key] !== ''
+      && JSON.stringify(current[key]) !== JSON.stringify(previous?.[key] ?? null))
+    .map((key) => [key, current[key]]));
+}
+
 export function typeLabel(t) { return TYPE_LABELS[t] || t || '—'; }
 
 export function money(v, currency = 'EUR') {

@@ -138,8 +138,10 @@ body.chat-active .app { height: 100dvh; min-height: 0; overflow: hidden; }
 .main.chat-main { min-height: 0; }
 .main > *, .main .card, .main .grid, .main .stack, .main .form-grid, .main .tabs, .main .toolbar { max-width: 100%; min-width: 0; }
 @media (min-width: 900px) {
-  .sidenav { display: flex; }
+  .sidenav { display: flex; flex: 1; }
   .sidenav a { flex-direction: row; }
+  .sidenav a[href="#/meer"] { margin-left: auto; }
+  .topbar-right { margin-left: 0; }
   .bottomnav { display: none; }
   .main { padding: 1.5rem 2rem; }
 }

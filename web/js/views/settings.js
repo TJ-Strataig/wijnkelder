@@ -82,7 +82,7 @@ async function personalView(main, { navigate }) {
 
     const providerSel = select(Object.entries(providers).map(([k, v]) => [k, v.label]), { value: data.active?.provider || 'anthropic' });
     const modelSel = select([]);
-    const customModel = input({ placeholder: 'Of typ een modelnaam, bijv. claude-sonnet-4-5-20250929', maxlength: 80 });
+    const customModel = input({ placeholder: 'Of typ een modelnaam, bijv. claude-sonnet-5-5', maxlength: 80 });
     const keyInput = el('input', { type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: data.active?.source === 'settings' && data.active.provider === providerSel.value ? 'Leeg laten = huidige sleutel behouden' : 'sk-ant-… of sk-…', maxlength: 300 });
     const showKey = el('button', { class: 'btn ghost sm', type: 'button', text: '👁', title: 'Sleutel tonen/verbergen', onClick: () => { keyInput.type = keyInput.type === 'password' ? 'text' : 'password'; } });
     const keyHelp = el('small', { class: 'muted' });
@@ -141,7 +141,7 @@ async function personalView(main, { navigate }) {
         el('div', { class: 'full' }, el('label', { class: 'field' }, el('span', { text: 'API-sleutel' }), el('div', { class: 'row' }, el('div', { class: 'grow' }, keyInput), showKey), keyHelp))),
       el('div', { class: 'row' }, saveBtn, testBtn, removeBtn),
       status,
-      el('p', { class: 'small muted', style: { marginTop: '0.8rem' }, text: 'Tip: Claude Sonnet is een goede balans tussen kwaliteit en kosten voor etiketten. Haiku is het goedkoopst voor spijs-wijn advies; Opus geeft de meest uitgebreide beschrijvingen. Alle leden van het huishouden gebruiken dezelfde sleutel; AI-gebruik is begrensd op 60 verzoeken per uur per persoon.' }));
+      el('p', { class: 'small muted', style: { marginTop: '0.8rem' }, text: 'Tip: Claude Sonnet 5.5 is een goede balans tussen kwaliteit en kosten. Opus 5.5 is krachtiger en duurder. Haiku 4.5 blijft beschikbaar tot de aangekondigde retirement (niet vóór 15 oktober 2026). Alle leden gebruiken dezelfde sleutel; AI-gebruik is begrensd op 60 verzoeken per uur per persoon.' }));
   }
   loadAi();
 

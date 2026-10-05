@@ -82,4 +82,5 @@ test('late navigation renders are detached, disposed and cannot redirect the cur
   assert.ok(moreLinks.includes('#/voorraad'));
   assert.ok(moreLinks.includes('#/sommelier'));
   assert.ok(mainLinks('sidenav').includes('#/meer'));
+  assert.equal(mainLinks('sidenav').at(-1), '#/meer', 'Meer staat als laatste rechts in het desktopmenu');
 });

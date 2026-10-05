@@ -1,6 +1,6 @@
 // AI-functies: etiket herkennen vanaf een foto, prijsindicatie en spijs-wijn advies uit de eigen kelder.
 // Werkt met Anthropic (Claude) én met elke OpenAI-compatibele API; de beheerder kiest aanbieder, sleutel en model in de app.
-import { HttpError, json, readJson, str, oneOf, rateLimit, WINE_TYPES, logActivity, nowIso, getSetting, setSetting, encryptSecret, decryptSecret, safeHttpsUrl } from './util.js';
+import { HttpError, json, readJson, str, num, strArray, oneOf, rateLimit, WINE_TYPES, logActivity, nowIso, getSetting, setSetting, encryptSecret, decryptSecret, safeHttpsUrl } from './util.js';
 
 const WINE_SCHEMA_HINT = `{
   "name": "naam van de wijn zoals op het etiket (zonder producent als die apart staat)",
@@ -42,11 +42,9 @@ export const PROVIDERS = {
     baseUrl: 'https://api.anthropic.com',
     keyPattern: /^sk-ant-[A-Za-z0-9_-]{20,}$/,
     models: [
-      { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 — aanbevolen (slim, snel, goed met foto\'s)' },
-      { id: 'claude-opus-4-1', label: 'Claude Opus 4.1 — hoogste kwaliteit, duurder' },
-      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — snelst en goedkoopst' },
-      { id: 'claude-3-7-sonnet-latest', label: 'Claude 3.7 Sonnet' },
-      { id: 'claude-3-5-haiku-latest', label: 'Claude 3.5 Haiku' },
+      { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 — aanbevolen (snel en sterk met foto\'s)' },
+      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 — krachtiger, hogere kosten' },
+      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — snel en voordelig; retirement niet vóór 15 okt 2026' },
     ],
   },
   openai: {
@@ -62,7 +60,13 @@ export const PROVIDERS = {
   },
 };
 
-const DEFAULT_MODEL = { anthropic: 'claude-sonnet-4-5', openai: 'gpt-4o-mini' };
+const DEFAULT_MODEL = { anthropic: 'claude-sonnet-5-5', openai: 'gpt-4o-mini' };
+const CONFIGURABLE_PROVIDERS = ['anthropic'];
+
+function anthropicSamplingParams(model, temperature) {
+  if (/^claude-(?:sonnet|opus)-5-5$/.test(model || '')) return {};
+  return { temperature };
+}
 
 // Leest de actieve AI-configuratie: instellingen uit de app gaan vóór de omgevingsvariabelen van de Worker.
 async function aiConfig(env) {
@@ -104,7 +108,7 @@ async function callProvider(cfg, messages, { maxTokens, temperature }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: cfg.model, max_tokens: maxTokens, temperature,
+        model: cfg.model, max_tokens: maxTokens, ...anthropicSamplingParams(cfg.model, temperature),
         system: `${system}\n\nAntwoord uitsluitend met één geldig JSON-object, zonder uitleg of markdown eromheen.`,
         messages: msgs,
       }),
@@ -178,7 +182,7 @@ export async function chatWithTools(env, { system, messages, tools, maxTokens = 
     const merged = [];
     for (const m of msgs) { const last = merged[merged.length - 1]; if (last && last.role === m.role) { last.content = [...(typeof last.content === 'string' ? [{ type: 'text', text: last.content }] : last.content), ...(typeof m.content === 'string' ? [{ type: 'text', text: m.content }] : m.content)]; } else merged.push({ ...m }); }
     const res = await fetch(`${base}/v1/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: cfg.model, max_tokens: maxTokens, temperature, system, messages: merged, tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema })) }) });
+      body: JSON.stringify({ model: cfg.model, max_tokens: maxTokens, ...anthropicSamplingParams(cfg.model, temperature), system, messages: merged, tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema })) }) });
     if (!res.ok) throw await providerError(res);
     const data = await res.json();
     const text = (data.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n').trim();
@@ -211,7 +215,7 @@ async function chat(env, messages, { maxTokens = 1500, temperature = 0.2 } = {})
 // GET /api/ai/settings — voor iedereen zichtbaar: welke aanbieder/model actief is (nooit de sleutel zelf).
 export async function getAiSettings(req, env) {
   const saved = await getSetting(env, 'ai');
-  const providers = Object.fromEntries(Object.entries(PROVIDERS).map(([k, v]) => [k, { label: v.label, models: v.models }]));
+  const providers = Object.fromEntries(CONFIGURABLE_PROVIDERS.map((key) => [key, { label: PROVIDERS[key].label, models: PROVIDERS[key].models }]));
   let active = null;
   try {
     const cfg = await aiConfig(env);
@@ -223,7 +227,7 @@ export async function getAiSettings(req, env) {
 // PUT /api/ai/settings — alleen beheerder. { provider, model, api_key? , base_url? }  (api_key leeg = bestaande sleutel behouden)
 export async function saveAiSettings(req, env, { user }) {
   const body = await readJson(req, 10_000);
-  const provider = oneOf(body.provider, Object.keys(PROVIDERS), { name: 'Aanbieder', required: true });
+  const provider = oneOf(body.provider, CONFIGURABLE_PROVIDERS, { name: 'Aanbieder', required: true });
   const model = str(body.model, { max: 80, required: true, name: 'Model' });
   if (!/^[A-Za-z0-9._:-]+$/.test(model)) throw new HttpError(400, 'Ongeldige modelnaam.');
   const baseUrl = str(body.base_url, { max: 200 });
@@ -328,8 +332,31 @@ export async function recognize(req, env, { user }) {
   }
   if (image.length > 11_000_000) throw new HttpError(413, 'Foto is te groot.');
   const hint = str(body.hint, { max: 300 });
+  const rawCorrections = body.corrections;
+  if (rawCorrections !== undefined && (!rawCorrections || typeof rawCorrections !== 'object' || Array.isArray(rawCorrections))) {
+    throw new HttpError(400, 'Ongeldige handmatige correcties.');
+  }
+  const corrections = {};
+  if (rawCorrections) {
+    const correctionMax = { name: 200, producer: 200, country: 100, region: 150, appellation: 150 };
+    for (const [key, max] of Object.entries(correctionMax)) {
+      if (Object.hasOwn(rawCorrections, key)) {
+        const value = str(rawCorrections[key], { max });
+        if (value) corrections[key] = value;
+      }
+    }
+    if (Object.hasOwn(rawCorrections, 'type')) corrections.type = oneOf(rawCorrections.type, WINE_TYPES, { name: 'Type', required: true });
+    if (Object.hasOwn(rawCorrections, 'vintage')) {
+      const vintage = num(rawCorrections.vintage, { min: 1800, max: 2100, int: true, name: 'Jaargang' });
+      if (vintage !== null) corrections.vintage = vintage;
+    }
+    if (Object.hasOwn(rawCorrections, 'grapes')) corrections.grapes = strArray(rawCorrections.grapes, { maxItems: 12, maxLen: 60 });
+  }
   const year = new Date().getFullYear();
 
+  const correctionText = Object.keys(corrections).length
+    ? `\nDoor de gebruiker gecontroleerde gegevens (leidend; gebruik deze correcties en herken de overige gegevens opnieuw): ${JSON.stringify(corrections)}`
+    : '';
   const result = await chat(env, [
     {
       role: 'system',
@@ -342,14 +369,15 @@ export async function recognize(req, env, { user }) {
     {
       role: 'user',
       content: [
-        { type: 'text', text: hint ? `Herken deze wijn. Extra aanwijzing: ${hint}` : 'Herken deze wijn en vul alle velden zo volledig mogelijk in.' },
+        { type: 'text', text: `${hint ? `Herken deze wijn. Extra aanwijzing: ${hint}` : 'Herken deze wijn en vul alle velden zo volledig mogelijk in.'}${correctionText}` },
         { type: 'image_url', image_url: { url: image, detail: 'high' } },
       ],
     },
   ], { maxTokens: 1800 });
 
-  await logActivity(env, user.id, 'ai.recognize', 'wine', null, { name: result.name });
-  return json({ wine: sanitizeRecognition(result) });
+  const wine = { ...sanitizeRecognition(result), ...corrections };
+  await logActivity(env, user.id, 'ai.recognize', 'wine', null, { name: wine.name });
+  return json({ wine });
 }
 
 // POST /api/ai/enrich  { name, producer, vintage, ... }  -> aanvullen van een handmatig ingevoerde wijn

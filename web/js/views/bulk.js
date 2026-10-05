@@ -2,7 +2,7 @@
 //  • Direct beoordelen: foto's → herkenning → per fles controleren en goedkeuren (alles in deze sessie).
 //  • Later beoordelen: foto's + herkenning gaan naar de beoordelingswachtrij op de server; later (bijv. op de desktop)
 //    loop je ze door. Niets komt in de kelder zonder expliciete goedkeuring per fles.
-import { el, clear, field, input, select, checkbox, toast, confirmDialog, TYPE_LABELS, shrinkImage, wineTitle, money, fmtDateTime } from '../util.js';
+import { el, clear, field, input, select, checkbox, toast, confirmDialog, TYPE_LABELS, shrinkImage, wineTitle, money, fmtDateTime, recognitionCorrections } from '../util.js';
 import { api, photoUrl } from '../api.js';
 import { loadWines, invalidateWines } from '../data.js';
 import { destinationForm, duplicateDialog } from './wine.js';
@@ -72,8 +72,8 @@ function findDuplicate(existing, w) {
   return existing.find((x) => x.name.toLowerCase() === n && (x.producer || '').toLowerCase() === p && (x.vintage || null) === (w.vintage || null)) || null;
 }
 
-async function recognizeDataUrl(dataUrl) {
-  const r = await api.post('/api/ai/recognize', { image: dataUrl });
+async function recognizeDataUrl(dataUrl, corrections) {
+  const r = await api.post('/api/ai/recognize', { image: dataUrl, corrections });
   const wine = Object.fromEntries(Object.entries(r.wine).filter(([k, v]) => v !== null && v !== undefined && k !== 'confidence'));
   if (!wine.type) wine.type = 'rood';
   return { wine, confidence: r.wine.confidence };
@@ -220,6 +220,28 @@ function uploadView(body, existing, { refreshCount }) {
     const df = destinationForm({ compact: true });
     wrap.append(wf.node, el('div', { style: { padding: '0.6rem', margin: '0.4rem 0', background: 'var(--paper)', borderRadius: '10px' } }, bf.node, df.node));
     const approveBtn = el('button', { class: 'btn gold', type: 'button', text: '✓ Goedkeuren en toevoegen' });
+    const retryBtn = el('button', { class: 'btn secondary sm', type: 'button', text: '✨ Opnieuw herkennen met correcties' });
+    retryBtn.addEventListener('click', async () => {
+      const current = wf.values();
+      const corrections = recognitionCorrections(current, it.wine);
+      if (!Object.keys(corrections).length) return toast('Pas eerst het herkende type of een ander gegeven aan', 'error');
+      setBusy(true);
+      try {
+        if (!it.dataUrl) {
+          const resized = await shrinkImage(it.file);
+          it.dataUrl = resized.dataUrl;
+          it.blob = resized.blob;
+        }
+        const result = await recognizeDataUrl(it.dataUrl, corrections);
+        it.wine = { ...result.wine, ...corrections };
+        it.confidence = result.confidence;
+        it.duplicate = findDuplicate(existing, it.wine);
+        draw(it);
+      } catch (e) {
+        toast(e.message, 'error');
+        setBusy(false);
+      }
+    });
     approveBtn.addEventListener('click', async () => {
       if (busy) return;
       const w = wf.values(); if (!w.name) return toast('Vul een naam in', 'error');
@@ -251,7 +273,7 @@ function uploadView(body, existing, { refreshCount }) {
         it.status = 'opgeslagen'; toQueueBtn.hidden = false; refreshCount(); draw(it); updateProgress();
       } catch (e) { toast(e.message, 'error'); setBusy(false); }
     } });
-    wrap.append(el('div', { class: 'row' }, approveBtn, deferBtn, el('button', { class: 'btn ghost sm', type: 'button', text: 'Overslaan', onClick: () => { it.status = 'overgeslagen'; draw(it); updateProgress(); } })));
+    wrap.append(el('div', { class: 'row' }, retryBtn, approveBtn, deferBtn, el('button', { class: 'btn ghost sm', type: 'button', text: 'Overslaan', onClick: () => { it.status = 'overgeslagen'; draw(it); updateProgress(); } })));
     return wrap;
   }
 
@@ -328,6 +350,22 @@ async function queueView(body, existing, { refreshCount }) {
     const df = destinationForm({ compact: true });
     wrap.append(wf.node, el('div', { style: { padding: '0.6rem', margin: '0.4rem 0', background: 'var(--paper)', borderRadius: '10px' } }, bf.node, df.node));
     const approveBtn = el('button', { class: 'btn gold', type: 'button', text: '✓ Goedkeuren en toevoegen' });
+    const retryBtn = el('button', { class: 'btn secondary sm', type: 'button', text: '✨ Opnieuw herkennen met correcties', onClick: async () => {
+      const current = wf.values();
+      const corrections = recognitionCorrections(current, it.wine || {});
+      if (!Object.keys(corrections).length) return toast('Pas eerst het herkende type of een ander gegeven aan', 'error');
+      retryBtn.disabled = true;
+      try {
+        if (!it.label_image_url) throw new Error('De etiketfoto ontbreekt; herken de wijn opnieuw met een foto.');
+        const response = await fetch(photoUrl(it.label_image_url));
+        if (!response.ok) throw new Error(`Etiketfoto ophalen mislukt (${response.status}).`);
+        const { dataUrl } = await shrinkImage(await response.blob());
+        const result = await recognizeDataUrl(dataUrl, corrections);
+        await api.patch(`/api/intake/${it.id}`, { wine: { ...result.wine, ...corrections }, confidence: result.confidence, status: 'recognized', error: null });
+        toast('Wijn opnieuw herkend met je correcties', 'ok');
+        await load(); refreshCount();
+      } catch (e) { toast(e.message, 'error'); retryBtn.disabled = false; }
+    } });
     approveBtn.addEventListener('click', async () => {
       const w = wf.values(); if (!w.name) return toast('Vul een naam in', 'error');
       approveBtn.disabled = true; approveBtn.textContent = 'Toevoegen…';
@@ -348,7 +386,7 @@ async function queueView(body, existing, { refreshCount }) {
     const saveBtn = el('button', { class: 'btn ghost sm', type: 'button', text: 'Wijzigingen bewaren', title: 'Opslaan zonder goed te keuren', onClick: async () => { try { await api.patch(`/api/intake/${it.id}`, { wine: wf.values(), bottle: bf.values() }); toast('Bewaard', 'ok'); } catch (e) { toast(e.message, 'error'); } } });
     const skipBtn = el('button', { class: 'btn ghost sm', type: 'button', text: 'Overslaan', onClick: async () => { await api.patch(`/api/intake/${it.id}`, { status: 'skipped', wine: wf.values() }); load(); refreshCount(); } });
     const delBtn = el('button', { class: 'btn ghost sm', type: 'button', text: '🗑', title: 'Verwijderen uit wachtrij', onClick: async () => { if (await confirmDialog('Verwijderen', 'Dit item en de foto uit de wachtrij verwijderen?', { okLabel: 'Verwijderen', danger: true })) { await api.del(`/api/intake/${it.id}`); load(); refreshCount(); } } });
-    wrap.append(el('div', { class: 'row' }, approveBtn, saveBtn, skipBtn, delBtn));
+    wrap.append(el('div', { class: 'row' }, retryBtn, approveBtn, saveBtn, skipBtn, delBtn));
     return wrap;
   }
   await load();

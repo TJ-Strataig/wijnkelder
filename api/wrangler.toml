@@ -17,7 +17,7 @@ RP_NAME = "Wijnkelder van Angela & Tije"
 # daar kies je Anthropic (Claude) of OpenAI, het model en voer je de API-sleutel in.
 # De onderstaande waarden zijn optioneel en dienen alleen als terugvaloptie als er in de app niets is ingesteld.
 # AI_PROVIDER = "anthropic"          # of "openai"
-# AI_MODEL = "claude-sonnet-4-5"
+# AI_MODEL = "claude-sonnet-5-5"
 # AI_BASE_URL = "https://api.anthropic.com"
 
 # Secrets (NIET hier invullen, maar via `wrangler secret put <NAAM>`):

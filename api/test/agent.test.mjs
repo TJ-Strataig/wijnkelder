@@ -104,7 +104,7 @@ test('etiketfoto: herkennen → wachtrij (niet in kelder) → na bevestiging toe
     if (!hasTool('zet_in_wachtrij')) return new Response(JSON.stringify(tool('zet_in_wachtrij', { aantal: 1 }, 'tu_2')));
     return new Response(JSON.stringify(text('Herkend: Muga Reserva 2019 — staat al in jullie kelder (3×). Ik heb hem in de wachtrij gezet. Hoeveel flessen en wat heb je betaald?')));
   };
-  const r = await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { text: 'Net gekocht', image: img } });
+  const r = await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { text: 'Bewaar deze wijn voor later beoordelen.', image: img } });
   assert.equal(r.status, 200);
   assert.deepEqual(r.json.actions.map((a) => a.tool), ['herken_etiket', 'zet_in_wachtrij']);
   assert.equal((await call(worker, env, `/api/wines/${w.wine.id}`, { token: u.token })).json.wine.bottles_in_cellar, 3, 'niets in de kelder zonder bevestiging');
@@ -122,6 +122,50 @@ test('etiketfoto: herkennen → wachtrij (niet in kelder) → na bevestiging toe
   assert.equal(r2.json.actions[0].tool, 'voeg_toe_aan_kelder'); assert.match(r2.json.actions[0].result, /bijgeboekt/);
   assert.equal((await call(worker, env, `/api/wines/${w.wine.id}`, { token: u.token })).json.wine.bottles_in_cellar, 9);
   assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM wines').first()).n, 1, 'geen dubbel record');
+});
+
+test('etiketherkenning blijft beschikbaar voor een vervolgactie naar kelder of historie', async () => {
+  const { env, u } = await setup();
+  const image = 'data:image/jpeg;base64,' + 'A'.repeat(400);
+  const recognizedWine = { name: 'Domaine Blanc', producer: 'Domaine Blanc', type: 'wit', vintage: 2023, country: 'Frankrijk', grapes: ['Chardonnay'], confidence: 0.94 };
+  globalThis.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.max_tokens <= 20) return new Response(JSON.stringify({ content: [{ type: 'text', text: '{"wine":true}' }] }));
+    if (!body.tools) return new Response(JSON.stringify(text(JSON.stringify(recognizedWine))));
+    const toolCalls = body.messages.flatMap((m) => Array.isArray(m.content) ? m.content.filter((part) => part.type === 'tool_use') : []);
+    const results = body.messages.flatMap((m) => Array.isArray(m.content) ? m.content.filter((part) => part.type === 'tool_result') : []);
+    if (toolCalls.some((toolCall) => toolCall.name === 'herken_etiket')) return new Response(JSON.stringify(text('Ik herken Domaine Blanc 2023 als witte wijn. Wil je hem aan de kelder toevoegen of in de historie zetten?')));
+    if (results.some((result) => JSON.parse(result.content).naar_historie)) return new Response(JSON.stringify(text('Domaine Blanc staat in de historie als gedronken bij vrienden.')));
+    if (Array.isArray(body.messages.at(-1).content) && body.messages.at(-1).content.some((part) => part.type === 'image')) {
+      return new Response(JSON.stringify(tool('herken_etiket', {})));
+    }
+    assert.match(body.system, /"type":"wit"/, 'de vervolgbeurt krijgt de gestructureerde herkenning mee');
+    return new Response(JSON.stringify(tool('voeg_toe_aan_kelder', {
+      aantal: 1,
+      al_gedronken: { waar: 'bij vrienden', datum: '2026-10-05', gelegenheid: 'diner' },
+    })));
+  };
+
+  const first = await call(worker, env, '/api/sommelier/chat', {
+    method: 'POST', token: u.token, body: { text: 'Wat is dit voor wijn?', image },
+  });
+  assert.equal(first.status, 200);
+  assert.equal(first.json.actions[0].tool, 'herken_etiket');
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM wines').first()).n, 1, 'herkenning alleen schrijft nog geen wijnrecord');
+
+  const history = await call(worker, env, '/api/sommelier/chat', { token: u.token });
+  const savedAction = history.json.messages.find((message) => message.role === 'assistant').actions[0];
+  assert.equal(savedAction.recognized_wine.type, 'wit');
+
+  const followUp = await call(worker, env, '/api/sommelier/chat', {
+    method: 'POST', token: u.token, body: { text: 'Zet die wijn in de historie; we dronken hem bij vrienden.' },
+  });
+  assert.equal(followUp.status, 200);
+  assert.match(followUp.json.reply, /historie/);
+  const savedWine = await env.DB.prepare("SELECT w.name, w.type, b.status FROM wines w JOIN bottles b ON b.wine_id = w.id WHERE w.name = 'Domaine Blanc'").first();
+  assert.equal(savedWine.name, 'Domaine Blanc');
+  assert.equal(savedWine.type, 'wit');
+  assert.equal(savedWine.status, 'consumed');
 });
 
 test('chat: login vereist, rate limit, gesprek wissen, ongeldige foto geweigerd', async () => {
