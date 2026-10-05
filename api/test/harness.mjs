@@ -8,7 +8,11 @@ export function makeDb() {
   const wrap = (sql) => {
     let bound = [];
     const api = {
-      bind: (...a) => { bound = a.map((v) => (v === undefined ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v)); return api; },
+      bind: (...a) => {
+        if (a.includes(undefined)) throw new TypeError("D1 does not support 'undefined' as a bound value");
+        bound = a.map((v) => (typeof v === 'boolean' ? (v ? 1 : 0) : v));
+        return api;
+      },
       first: async () => db.prepare(sql).get(...bound) ?? null,
       all: async () => ({ results: db.prepare(sql).all(...bound) }),
       run: () => { const r = db.prepare(sql).run(...bound); return { meta: { changes: r.changes } }; },

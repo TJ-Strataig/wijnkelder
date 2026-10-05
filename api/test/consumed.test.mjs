@@ -10,6 +10,7 @@ test('direct naar historie: restaurantfles, met plaats/datum/proefnotitie; niet 
     name: 'Barolo', producer: 'Test', type: 'rood', vintage: 2018, quantity: 1, bottle: { price: 85 },
     consumed: { reason: 'consumed', date: '2026-09-05', place: 'Restaurant De Librije', occasion: 'Verjaardag Angela', tasting: { rating: 92, notes: 'Prachtig', paired_with: 'Ree' } } } });
   assert.equal(r.status, 200);
+  assert.equal(r.json.bottles[0].slot_id, null, 'een fles zonder gekozen vak krijgt een expliciete NULL');
   assert.equal(r.json.wine.bottles_in_cellar, 0, 'niet in de kelder');
   assert.equal(r.json.bottles.length, 1);
   const b = r.json.bottles[0];

@@ -72,7 +72,7 @@ export async function legacyLocations(req, env) {
 }
 
 export async function validateSlot(env, slotId) {
-  if (slotId === undefined) return undefined;
+  if (slotId === undefined) return null;
   if (slotId === null || slotId === '') return null;
   const row=await one(env.DB,'SELECT id FROM slots WHERE id=?',slotId);
   if(!row) throw new HttpError(400,'Ongeldig vak.');
