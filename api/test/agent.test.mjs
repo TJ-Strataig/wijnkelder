@@ -152,6 +152,7 @@ test('etiketherkenning blijft beschikbaar voor een vervolgactie naar kelder of h
   assert.equal(first.status, 200);
   assert.equal(first.json.actions[0].tool, 'herken_etiket');
   assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM wines').first()).n, 1, 'herkenning alleen schrijft nog geen wijnrecord');
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM intake_queue').first()).n, 0, 'gewone fotoherkenning zet geen concept klaar');
 
   const history = await call(worker, env, '/api/sommelier/chat', { token: u.token });
   const savedAction = history.json.messages.find((message) => message.role === 'assistant').actions[0];
@@ -168,11 +169,38 @@ test('etiketherkenning blijft beschikbaar voor een vervolgactie naar kelder of h
   assert.equal(savedWine.status, 'consumed');
 });
 
+test('foto toevoegen vanuit de chat zet een controleerbaar concept klaar zonder keldermutatie', async (t) => {
+  const { env, u } = await setup();
+  t.after(() => env.DB.raw.close());
+  const image = 'data:image/jpeg;base64,' + 'A'.repeat(400);
+  const recognizedWine = { name: 'Domaine Blanc', producer: 'Domaine Blanc', type: 'wit', vintage: 2023, country: 'Frankrijk', grapes: ['Chardonnay'], confidence: 0.94 };
+  mockModel([() => text(JSON.stringify(recognizedWine))]);
+
+  const result = await call(worker, env, '/api/sommelier/chat', {
+    method: 'POST', token: u.token, body: { text: 'Herken dit wijnetiket en zet de wijn klaar om toe te voegen aan mijn kelder.', image, stage_for_cellar: true },
+  });
+  assert.equal(result.status, 200);
+  assert.match(result.json.reply, /als concept klaargezet/);
+  assert.deepEqual(result.json.actions.map((action) => action.tool), ['herken_etiket']);
+  assert.ok(result.json.actions[0].staged_intake_id);
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM wines').first()).n, 1, 'de kelder is niet aangepast');
+
+  const queue = await call(worker, env, '/api/intake', { token: u.token });
+  assert.equal(queue.json.counts.recognized, 1);
+  const item = queue.json.items.find((entry) => entry.id === result.json.actions[0].staged_intake_id);
+  assert.ok(item);
+  assert.equal(item.wine.name, recognizedWine.name);
+  assert.equal(item.bottle.quantity, 1);
+  assert.ok(item.label_image_url, 'de foto blijft aan het concept gekoppeld');
+  assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM bottles WHERE status = 'in_cellar'").first()).n, 3, 'er zijn geen flessen toegevoegd vóór goedkeuring');
+});
+
 test('chat: login vereist, rate limit, gesprek wissen, ongeldige foto geweigerd', async () => {
   const { env, u } = await setup();
   assert.equal((await call(worker, env, '/api/sommelier/chat', { method: 'POST', body: { text: 'hoi' } })).status, 401);
   assert.equal((await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { text: '' } })).status, 400);
   assert.equal((await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { image: 'data:text/html;base64,PHNjcmlwdD4=' } })).status, 400);
+  assert.equal((await call(worker, env, '/api/sommelier/chat', { method: 'POST', token: u.token, body: { text: 'Toevoegen', stage_for_cellar: true } })).status, 400, 'klaarzetten vereist een foto');
   assert.equal((await call(worker, env, '/api/sommelier/chat', { method: 'DELETE', token: u.token })).status, 200);
 });
 

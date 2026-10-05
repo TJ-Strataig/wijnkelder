@@ -7,6 +7,7 @@ const QUICK = [
   ['🍷 Wat drinken we vanavond?', 'Wat drinken we vanavond?'],
   ['⏳ Wat moet er snel op?', 'Welke wijnen moeten snel gedronken worden?'],
   ['📷 Etiket', null],
+  ['➕ Wijn toevoegen via foto', 'stage_photo'],
   ['🔎 Hebben we nog…', 'Hebben we nog '],
   ['🗂️ Wachtrij', 'Wat staat er in de beoordelingswachtrij?'],
 ];
@@ -34,10 +35,16 @@ export async function render(main) {
 
   let pending = null; // { dataUrl, blob }
   let busy = false;
+  let stageNextPhoto = false;
 
   for (const [label, text] of QUICK) {
     const c = el('button', { class: 'chip', type: 'button', text: label });
-    c.addEventListener('click', () => { if (text === null) camInput.click(); else if (text.endsWith(' ')) { input.value = text; input.focus(); } else send(text); });
+    c.addEventListener('click', () => {
+      if (text === 'stage_photo') { stageNextPhoto = true; camInput.click(); }
+      else if (text === null) { stageNextPhoto = false; camInput.click(); }
+      else if (text.endsWith(' ')) { input.value = text; input.focus(); }
+      else send(text);
+    });
     quick.append(c);
   }
 
@@ -47,7 +54,8 @@ export async function render(main) {
     if (m.image_url) b.append(el('img', { class: 'chat-img', src: photoUrl(m.image_url), alt: 'Meegestuurde foto', loading: 'lazy' }));
     else if (m.local_image) b.append(el('img', { class: 'chat-img', src: m.local_image, alt: 'Meegestuurde foto' }));
     if (m.content && m.content !== '📷 (foto)') b.append(...renderText(m.content));
-    if (m.actions?.length) b.append(el('div', { class: 'chat-actions', text: m.actions.map((a) => TOOL_LABEL[a.tool] || a.tool).filter((v, i, a) => a.indexOf(v) === i).join(' · ') }));
+    if (m.actions?.length) b.append(el('div', { class: 'chat-actions', text: m.actions.map((a) => a.staged_intake_id ? 'etiket herkend · klaar om toe te voegen' : TOOL_LABEL[a.tool] || a.tool).filter((v, i, a) => a.indexOf(v) === i).join(' · ') }));
+    if (m.actions?.some((a) => a.staged_intake_id)) b.append(el('a', { class: 'btn ghost sm', href: '#/toevoegen?tab=bulk&bulkTab=queue', text: 'Controleer en voeg toe →' }));
     if (m.created_at) b.append(el('div', { class: 'chat-time', text: fmtDateTime(m.created_at) }));
     return b;
   }
@@ -75,22 +83,32 @@ export async function render(main) {
     clear(log);
     try {
       const { messages } = await api.get('/api/sommelier/chat');
-      if (!messages.length) log.append(el('div', { class: 'chat-msg som' }, ...renderText(`Goedendag ${session.user?.name || ''}! Ik ben jullie huissommelier. Ik ken de kelder en help met:\n- **wat je vanavond opent** (evt. bij een gerecht)\n- **etiketten**: stuur een foto, ik herken de wijn en zet hem klaar\n- **wijnkaarten** in een restaurant: foto + wat je eet\n- **voorraad, drinkvensters, verlanglijst** en het afboeken van een fles met proefnotitie\n\nIk praat alleen over wijn. Waarmee kan ik helpen? 🍷`)));
+      if (!messages.length) log.append(el('div', { class: 'chat-msg som' }, ...renderText(`Goedendag ${session.user?.name || ''}! Ik ben jullie huissommelier. Ik ken de kelder en help met:\n- **wat je vanavond opent** (evt. bij een gerecht)\n- **etiketten toevoegen**: kies "Wijn toevoegen via foto" om een wijn te herkennen en als concept klaar te zetten\n- **wijnkaarten** in een restaurant: foto + wat je eet\n- **voorraad, drinkvensters, verlanglijst** en het afboeken van een fles met proefnotitie\n\nIk praat alleen over wijn. Waarmee kan ik helpen? 🍷`)));
       for (const m of messages) log.append(bubble(m));
     } catch (e) { log.append(el('p', { class: 'badge bad', text: e.message })); }
     scroll();
   }
 
   async function setPhoto(file) {
-    try { pending = await shrinkImage(file, 1600, 0.86); clear(preview); preview.append(el('img', { src: pending.dataUrl, alt: '' }), el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Foto verwijderen', text: '✕', onClick: () => { pending = null; preview.hidden = true; } })); preview.hidden = false; input.focus(); }
+    try {
+      pending = await shrinkImage(file, 1600, 0.86);
+      clear(preview);
+      preview.append(el('img', { src: pending.dataUrl, alt: '' }), el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Foto verwijderen', text: '✕', onClick: () => { pending = null; preview.hidden = true; } }));
+      preview.hidden = false;
+      input.focus();
+      if (stageNextPhoto) {
+        stageNextPhoto = false;
+        await send('Herken dit wijnetiket en zet de wijn klaar om toe te voegen aan mijn kelder.', true);
+      }
+    }
     catch (e) { toast(e.message, 'error'); }
   }
-  fileInput.addEventListener('change', () => { if (fileInput.files[0]) setPhoto(fileInput.files[0]); fileInput.value = ''; });
+  fileInput.addEventListener('change', () => { stageNextPhoto = false; if (fileInput.files[0]) setPhoto(fileInput.files[0]); fileInput.value = ''; });
   camInput.addEventListener('change', () => { if (camInput.files[0]) setPhoto(camInput.files[0]); camInput.value = ''; });
-  photoBtn.addEventListener('click', () => fileInput.click());
-  camBtn.addEventListener('click', () => camInput.click());
+  photoBtn.addEventListener('click', () => { stageNextPhoto = false; fileInput.click(); });
+  camBtn.addEventListener('click', () => { stageNextPhoto = false; camInput.click(); });
 
-  async function send(forcedText) {
+  async function send(forcedText, stageForCellar = false) {
     if (busy) return;
     const text = (forcedText ?? input.value).trim();
     if (!text && !pending) return;
@@ -101,7 +119,7 @@ export async function render(main) {
     log.append(typing); scroll();
     const img = pending?.dataUrl; pending = null; preview.hidden = true;
     try {
-      const r = await api.post('/api/sommelier/chat', { text, image: img || undefined });
+      const r = await api.post('/api/sommelier/chat', { text, image: img || undefined, stage_for_cellar: stageForCellar });
       typing.remove();
       log.append(bubble({ role: 'assistant', content: r.reply, actions: r.actions, created_at: new Date().toISOString() }));
       if (r.actions?.some((a) => ['voeg_toe_aan_kelder', 'fles_afboeken', 'zet_in_wachtrij'].includes(a.tool))) invalidateWines();
