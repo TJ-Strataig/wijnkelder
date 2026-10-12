@@ -70,6 +70,33 @@ test('Anthropic 5.5-verzoeken laten temperature weg voor JSON- en tool-calls', a
   }
 });
 
+test('Vanavond kan een geldig JSON-advies uit tekst met extra accolades uitlezen', async (t) => {
+  const env = makeEnv();
+  const user = await seedUser(env);
+  t.after(() => env.DB.raw.close());
+  const realFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  await call(worker, env, '/api/ai/settings', {
+    method: 'PUT',
+    token: user.token,
+    body: { provider: 'anthropic', model: 'claude-sonnet-5-5', api_key: `sk-ant-api03-${'A'.repeat(40)}` },
+  });
+  await call(worker, env, '/api/wines', {
+    method: 'POST',
+    token: user.token,
+    body: { name: 'Testwijn', type: 'rood', quantity: 1 },
+  });
+  globalThis.fetch = async () => Response.json({
+    stop_reason: 'end_turn',
+    content: [{ type: 'text', text: 'Hier is het advies: {"summary":"Past bij een saus {met kruiden}.","picks":[]} Noot: {intern gecontroleerd}' }],
+  });
+
+  const response = await call(worker, env, '/api/sommelier/tonight', { method: 'POST', token: user.token, body: {} });
+  assert.equal(response.status, 200);
+  assert.equal(response.json.summary, 'Past bij een saus {met kruiden}.');
+  assert.deepEqual(response.json.picks, []);
+});
+
 test('fotoherkenning gebruikt en bewaart handmatige correcties', async (t) => {
   const env = makeEnv();
   const user = await seedUser(env);

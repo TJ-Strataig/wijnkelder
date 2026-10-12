@@ -157,8 +157,25 @@ function openaiParams(model, maxTokens, temperature) {
 function extractJson(text) {
   const cleaned = String(text).replace(/```(?:json)?/gi, '').trim();
   try { return JSON.parse(cleaned); } catch { /* val terug op zoeken */ }
-  const start = cleaned.indexOf('{'); const end = cleaned.lastIndexOf('}');
-  if (start >= 0 && end > start) { try { return JSON.parse(cleaned.slice(start, end + 1)); } catch { /* onleesbaar */ } }
+  for (let start = cleaned.indexOf('{'); start >= 0; start = cleaned.indexOf('{', start + 1)) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = start; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') inString = true;
+      else if (char === '{') depth++;
+      else if (char === '}' && --depth === 0) {
+        try { return JSON.parse(cleaned.slice(start, i + 1)); } catch { break; }
+      }
+    }
+  }
   throw new HttpError(502, 'De AI gaf een onleesbaar antwoord.');
 }
 
