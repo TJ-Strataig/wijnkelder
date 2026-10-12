@@ -179,7 +179,7 @@ function extractJson(text) {
   throw new HttpError(502, 'De AI gaf een onleesbaar antwoord.');
 }
 
-export async function chatJson(env, messages, opts) { return chat(env, messages, opts); }
+export async function chatJson(env, messages, opts = {}) { return chat(env, messages, { ...opts, retryInvalidJson: true }); }
 export async function getAiConfig(env) { return aiConfig(env); }
 
 // ---- Tool-calling (agent) voor Anthropic en OpenAI ---------------------------------------------
@@ -222,9 +222,25 @@ export async function chatWithTools(env, { system, messages, tools, maxTokens = 
   return { text: (msg.content || '').trim(), toolCalls, stop: data.choices?.[0]?.finish_reason };
 }
 
-async function chat(env, messages, { maxTokens = 1500, temperature = 0.2 } = {}) {
+async function chat(env, messages, { maxTokens = 1500, temperature = 0.2, retryInvalidJson = false } = {}) {
   const cfg = await aiConfig(env);
-  return extractJson(await callProvider(cfg, messages, { maxTokens, temperature }));
+  try {
+    return extractJson(await callProvider(cfg, messages, { maxTokens, temperature }));
+  } catch (error) {
+    if (!retryInvalidJson || !(error instanceof HttpError) || error.message !== 'De AI gaf een onleesbaar antwoord.') throw error;
+    const retryMessages = [...messages, {
+      role: 'system',
+      content: 'Je vorige antwoord was niet parseerbaar. Genereer het antwoord opnieuw als één compact, strikt geldig JSON-object, zonder markdown of tekst eromheen.',
+    }];
+    try {
+      return extractJson(await callProvider(cfg, retryMessages, { maxTokens: Math.max(maxTokens * 2, 2000), temperature: 0.2 }));
+    } catch (retryError) {
+      if (retryError instanceof HttpError && retryError.message === 'De AI gaf een onleesbaar antwoord.') {
+        throw new HttpError(502, 'De AI gaf na een herhaalpoging nog steeds geen geldig JSON-antwoord. Probeer opnieuw; blijft dit gebeuren, controleer de AI-instelling.');
+      }
+      throw retryError;
+    }
+  }
 }
 
 // ---- instellingen-endpoints ---------------------------------------------------------------
