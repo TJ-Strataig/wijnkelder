@@ -129,6 +129,43 @@ test('Vanavond vraagt een compact JSON-antwoord opnieuw op als de AI onleesbare 
   assert.deepEqual(tokenLimits, [1200, 2400]);
 });
 
+test('uitgebreid wijnadvies herhaalt een AI-antwoord dat geen JSON is', async (t) => {
+  const env = makeEnv();
+  const user = await seedUser(env);
+  t.after(() => env.DB.raw.close());
+  const realFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  await call(worker, env, '/api/ai/settings', {
+    method: 'PUT',
+    token: user.token,
+    body: { provider: 'anthropic', model: 'claude-sonnet-5-5', api_key: `sk-ant-api03-${'A'.repeat(40)}` },
+  });
+  await call(worker, env, '/api/wines', {
+    method: 'POST',
+    token: user.token,
+    body: { name: 'Testwijn', type: 'rood', quantity: 1 },
+  });
+  const tokenLimits = [];
+  globalThis.fetch = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    tokenLimits.push(request.max_tokens);
+    return Response.json({
+      stop_reason: 'end_turn',
+      content: [{ type: 'text', text: tokenLimits.length === 1 ? 'Geen geldig antwoord' : '{"summary":"Past goed bij het gerecht","suggestions":[]}' }],
+    });
+  };
+
+  const response = await call(worker, env, '/api/ai/pair', {
+    method: 'POST',
+    token: user.token,
+    body: { dish: 'lamsrack' },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.json.summary, 'Past goed bij het gerecht');
+  assert.deepEqual(response.json.suggestions, []);
+  assert.deepEqual(tokenLimits, [900, 2000]);
+});
+
 test('fotoherkenning gebruikt en bewaart handmatige correcties', async (t) => {
   const env = makeEnv();
   const user = await seedUser(env);

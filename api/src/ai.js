@@ -179,7 +179,7 @@ function extractJson(text) {
   throw new HttpError(502, 'De AI gaf een onleesbaar antwoord.');
 }
 
-export async function chatJson(env, messages, opts = {}) { return chat(env, messages, { ...opts, retryInvalidJson: true }); }
+export async function chatJson(env, messages, opts = {}) { return chat(env, messages, opts); }
 export async function getAiConfig(env) { return aiConfig(env); }
 
 // ---- Tool-calling (agent) voor Anthropic en OpenAI ---------------------------------------------
@@ -222,7 +222,7 @@ export async function chatWithTools(env, { system, messages, tools, maxTokens = 
   return { text: (msg.content || '').trim(), toolCalls, stop: data.choices?.[0]?.finish_reason };
 }
 
-async function chat(env, messages, { maxTokens = 1500, temperature = 0.2, retryInvalidJson = false } = {}) {
+async function chat(env, messages, { maxTokens = 1500, temperature = 0.2, retryInvalidJson = true } = {}) {
   const cfg = await aiConfig(env);
   try {
     return extractJson(await callProvider(cfg, messages, { maxTokens, temperature }));
