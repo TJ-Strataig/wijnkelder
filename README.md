@@ -25,7 +25,7 @@ alle leden zien en beheren dezelfde collectie.
 
 ### Ontwerp, routes en mobiele werking
 
-Modern is de standaard en wordt lokaal per browser onthouden; Klassiek blijft beschikbaar als compacte, vertrouwde weergave. Wisselen verandert alleen CSS en navigatie, nooit de collectie of serverdata. Op telefoon en tablet werkt dezelfde hash-router met de onderste navigatie (Kelder, Sommelier, Meer); op desktop verschijnt de zijbalk. Via **Meer** zijn onder meer Voorraad, Herkomst, Wijnhuizen, Selecties, Avondplanning, Blindproeven, Rekken & vakken en Instellingen bereikbaar. Oude routes zoals `#/spijs` en `#/statistieken` verwijzen door naar Vanavond en Inzichten.
+Modern is de standaard en wordt lokaal per browser onthouden; Klassiek blijft beschikbaar als compacte, vertrouwde weergave. Wisselen verandert alleen CSS en navigatie, nooit de collectie of serverdata. De desktopzijbalk en mobiele onderbalk gebruiken dezelfde volledige hoofdnavigatie: Kelder, Toevoegen, Sommelier, Historie, Inzichten, Voorraad, Instellingen en Meer. Op smalle schermen is de onderbalk horizontaal te scrollen. Via **Meer** zijn ook Herkomst, Wijnhuizen, Selecties, Avondplanning, Blindproeven en Rekken & vakken bereikbaar. Oude routes zoals `#/spijs` en `#/statistieken` verwijzen door naar Vanavond en Inzichten.
 
 De belangrijkste routes zijn `#/kelder`, `#/toevoegen`, `#/bulk`, `#/wijn/:id`, `#/vanavond`, `#/sommelier`, `#/selecties` (en detail), `#/avonden` (en detail), `#/blindproeven` (en detail), `#/rekken`, `#/herkomst`, `#/wijnhuizen`, `#/historie`, `#/inzichten`, `#/voorraad` en `#/instellingen`. De moderne kelder biedt daarnaast een lijstweergave die op kleine schermen prettig scrollt.
 

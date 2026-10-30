@@ -125,11 +125,13 @@ a { color: var(--bordeaux-light); }
 .sidenav a:hover { background: rgba(255,255,255,0.1); }
 .sidenav a .ico { display: none; }
 .bottomnav {
-  position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-auto-flow: column; background: var(--paper);
+  position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-auto-flow: column;
+  grid-auto-columns: minmax(5rem, 1fr); overflow-x: auto; overscroll-behavior-x: contain;
+  background: var(--paper);
   border-top: 1px solid var(--line); z-index: 20; padding-bottom: env(safe-area-inset-bottom);
   transform: translateZ(0); -webkit-transform: translateZ(0);
 }
-.bottomnav a { color: var(--muted); font-size: 0.7rem; padding: 0.5rem 0.2rem; border-radius: 0; }
+.bottomnav a { color: var(--muted); font-size: 0.7rem; padding: 0.5rem 0.2rem; border-radius: 0; white-space: nowrap; }
 .bottomnav a.active { color: var(--bordeaux-light); }
 [data-theme="dark"] .bottomnav a.active { color: var(--gold); }
 .bottomnav .ico { font-size: 1.25rem; line-height: 1; }

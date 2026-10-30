@@ -47,14 +47,12 @@ test('late navigation renders are detached, disposed and cannot redirect the cur
   assert.equal(document.getElementById('main').textContent, 'history');
 
   const mainLinks = (id) => document.getElementById(id).querySelectorAll('a').map((a) => a.attrs.href);
-  for (const id of ['sidenav', 'bottomnav']) {
-    for (const path of ['/toevoegen', '/herkomst', '/wijnhuizen', '/vanavond', '/verlanglijst']) {
-      assert.ok(!mainLinks(id).includes(`#${path}`));
-    }
-  }
-  assert.deepEqual(mainLinks('bottomnav'), ['#/kelder', '#/sommelier', '#/meer']);
+  const expectedMainLinks = ['#/kelder', '#/toevoegen', '#/sommelier', '#/historie', '#/inzichten', '#/voorraad', '#/instellingen', '#/meer'];
+  assert.deepEqual(mainLinks('sidenav'), expectedMainLinks);
+  assert.deepEqual(mainLinks('bottomnav'), expectedMainLinks);
+  assert.deepEqual(mainLinks('bottomnav'), mainLinks('sidenav'), 'desktop en mobiel gebruiken dezelfde volledige hoofdnavigatie');
   for (const [parent, routes, views, bottom] of [
-    ['/voorraad', ['/voorraad', '/herkomst', '/wijnhuizen'], ['manage', 'map', 'producers'], '/meer'],
+    ['/voorraad', ['/voorraad', '/herkomst', '/wijnhuizen'], ['manage', 'map', 'producers'], '/voorraad'],
     ['/sommelier', ['/sommelier', '/vanavond', '/verlanglijst'], ['chat', 'tonight', 'wishlist'], '/sommelier'],
   ]) {
     for (const [i, path] of routes.entries()) {
@@ -72,7 +70,9 @@ test('late navigation renders are detached, disposed and cannot redirect the cur
   location.hash = '#/toevoegen?tab=bulk';
   await listeners.hashchange();
   assert.equal(document.getElementById('main').querySelector('p').textContent, 'add');
-  assert.equal(document.getElementById('sidenav').querySelector('.active').attrs.href, '#/kelder');
+  for (const id of ['sidenav', 'bottomnav']) {
+    assert.equal(document.getElementById(id).querySelector('.active').attrs.href, '#/toevoegen');
+  }
   location.hash = '#/meer';
   await listeners.hashchange();
   const moreLinks = mainLinks('main');

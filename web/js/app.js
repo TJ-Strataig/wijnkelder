@@ -25,7 +25,12 @@ import * as locations from './views/locations.js';
 
 const NAV = [
   { path: '/kelder', label: 'Kelder', ico: '🍷' },
+  { path: '/toevoegen', label: 'Toevoegen', ico: '＋' },
   { path: '/sommelier', label: 'Sommelier', ico: '🎩' },
+  { path: '/historie', label: 'Historie', ico: '📜' },
+  { path: '/inzichten', label: 'Inzichten', ico: '👅' },
+  { path: '/voorraad', label: 'Voorraad', ico: '🛒' },
+  { path: '/instellingen', label: 'Instellingen', ico: '⚙️' },
   { path: '/meer', label: 'Meer', ico: '☰' },
 ];
 
@@ -86,14 +91,11 @@ function renderNav(active) {
   const side = document.getElementById('sidenav');
   const bottom = document.getElementById('bottomnav');
   clear(side); clear(bottom);
-  const items = NAV.filter((n) => n.path !== '/meer');
-  items.push({ path: '/historie', label: 'Historie', ico: '📜' }, { path: '/inzichten', label: 'Inzichten', ico: '👅' }, { path: '/voorraad', label: 'Voorraad', ico: '🛒' });
-  if (document.body?.classList?.contains('design-modern')) items.splice(1, 0, { path: '/toevoegen', label: 'Toevoegen', ico: '＋' });
-  items.push({ path: '/instellingen', label: 'Instellingen', ico: '⚙️' }, NAV.find((n) => n.path === '/meer'));
-  for (const n of items) side.append(el('a', { href: `#${n.path}`, class: active === n.path ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));
   for (const n of NAV) {
-    const isActive = active === n.path || (n.path === '/meer' && ['/historie', '/inzichten', '/voorraad', '/instellingen'].includes(active));
-    bottom.append(el('a', { href: `#${n.path}`, class: isActive ? 'active' : '' }, el('span', { class: 'ico', text: n.ico }), n.label));
+    const link = el('a', { href: `#${n.path}`, class: active === n.path ? 'active' : '' },
+      el('span', { class: 'ico', text: n.ico }), n.label);
+    side.append(link.cloneNode(true));
+    bottom.append(link);
   }
   document.getElementById('user-chip').textContent = user ? user.name : '';
   refreshBell();
@@ -178,7 +180,12 @@ async function render() {
   document.getElementById('topbar').hidden = !loggedIn;
   document.getElementById('bottomnav').hidden = !loggedIn;
   const group = MENU_GROUPS.find((item) => item.links.some(([link]) => link === path));
-  if (loggedIn) renderNav(group?.path || (path.startsWith('/wijn/') || path === '/toevoegen' ? '/kelder' : path));
+  if (loggedIn) {
+    const groupPath = group && NAV.some((item) => item.path === group.path) ? group.path : null;
+    const navPath = groupPath || (path === '/bulk' || path === '/toevoegen' || path.endsWith('/bewerken') ? '/toevoegen'
+      : path.startsWith('/wijn/') ? '/kelder' : NAV.some((item) => item.path === path) ? path : '/meer');
+    renderNav(navPath);
+  }
 
   if (currentView?.destroy) currentView.destroy();
   currentView = null;
